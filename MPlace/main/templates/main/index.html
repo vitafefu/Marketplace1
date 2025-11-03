@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}Главная - Shop{% endblock %}
+
+{% block content %}
+<section class="hero" role="banner">
+    <div class="hero-content">
+        <h1>Найди свой стиль</h1>
+        <p>Маркетплейс, где твоя одежда находит тебя.</p>
+        <a href="#" class="btn">Перейти в каталог</a>
+    </div>
+</section>
+
+<main class="catalog" role="main">
+    <h2>Популярные товары</h2>
+
+    <section class="product-grid">
+        <article class="product-card">
+            <figure>
+                <img src="{% static 'main/img/jacket.jpg' %}" alt="Куртка">
+                <figcaption>Куртка</figcaption>
+            </figure>
+            <p class="price">4 500 ₽</p>
+            <button>Добавить в корзину</button>
+        </article>
+
+        <article class="product-card">
+            <figure>
+                <img src="{% static 'main/img/hoodie.jpg' %}" alt="Толстовка">
+                <figcaption>Толстовка</figcaption>
+            </figure>
+            <p class="price">3 200 ₽</p>
+            <button>Добавить в корзину</button>
+        </article>
+
+        <article class="product-card">
+            <figure>
+                <img src="{% static 'main/img/jeans.jpg' %}" alt="Джинсы">
+                <figcaption>Джинсы</figcaption>
+            </figure>
+            <p class="price">3 800 ₽</p>
+            <button>Добавить в корзину</button>
+        </article>
+
+        <article class="product-card">
+            <figure>
+                <img src="{% static 'main/img/vetrovka.jpg' %}" alt="Ветровка">
+                <figcaption>Ветровка</figcaption>
+            </figure>
+            <p class="price">3 800 ₽</p>
+            <button>Добавить в корзину</button>
+        </article>
+    </section>
+</main>
+{% endblock %}

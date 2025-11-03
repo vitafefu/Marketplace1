@@ -1,0 +1,330 @@
+/* ===================== Сброс отступов и шрифты ===================== */
+* {
+    margin: 0; /* Убирает все внешние отступы у всех элементов */
+    padding: 0; /* Убирает все внутренние отступы у всех элементов */
+    box-sizing: border-box; /* Устанавливает модель расчета размеров для всех элементов */
+}
+
+body {
+    font-family: Arial, sans-serif; /* Устанавливает шрифт по умолчанию для всего тела страницы */
+    line-height: 1.5; /* Устанавливает межстрочный интервал для текста */
+    background-color: #f8f8f8; /* Фоновый цвет для всей страницы */
+    color: #333; /* Цвет текста на странице */
+}
+
+/* ===================== Шапка ===================== */
+.header {
+    display: flex; /* Применяет CSS Grid Layout для шапки */
+    grid-template-columns: auto 1fr auto; /* Создает три колонки: левая (auto), центральная (1fr) и правая (auto) */
+    align-items: center; /* Выравнивание элементов по вертикали по центру */
+    gap: 15px; /* Задает промежуток между колонками */
+    padding: 20px 20px; /* Внутренние отступы вокруг содержимого шапки */
+    background-color: #fff; /* Фоновый цвет для шапки */
+    border-bottom: 1px solid #ddd; /* Нижняя граница для шапки */
+    position: sticky; /* Закрепляет шапку при прокрутке страницы */
+    top: 0; /* Устанавливает шапку на верхнюю границу экрана */
+    z-index: 100; /* Устанавливает z-index, чтобы шапка находилась поверх других элементов */
+}
+
+.header-left {
+    display: flex; /* Применяет Flexbox для левой части шапки */
+    align-items: center; /* Центрирует элементы по вертикали */
+    gap: 10px; /* Задает промежуток между элементами */
+    flex-shrink: 0; /* Запрещаем сжимать */
+}
+
+.menu-btn {
+    font-size: 1.5rem; /* Размер шрифта для кнопки меню */
+    background: none; /* Без фона для кнопки */
+    border: none; /* Без рамки */
+    cursor: pointer; /* Курсор в виде руки при наведении */
+}
+
+.logo-mini {
+    font-weight: bold; /* Жирное начертание для логотипа */
+    font-size: clamp(1rem, 2vw, 1.5rem); /* Динамичный размер шрифта, который зависит от ширины экрана */
+}
+
+.header-center {
+    display: flex; /* Используем flexbox */
+    justify-content: center; /* Центрируем элементы по горизонтали */
+    width: 100%;
+    flex-grow: 1; /* Форме поиска разрешается растягиваться */
+    margin: 0 10px; /* Отступы по бокам */
+    min-width: 0; /* Запрещаем сжимать форму ниже нужного размера */
+    overflow: hidden; /* Убирает лишний контент, если не помещается */
+}
+
+.search-form {
+    display: flex; /* Flexbox для формы поиска */
+    width: 100%; /* Форма занимает всю доступную ширину */
+    max-width: 800px; /* Максимальная ширина для формы поиска */
+    min-width: 70px; /* Минимальная ширина для формы поиска */
+    flex-grow: 1; /* Форма будет растягиваться, если есть место */
+    margin: 0 20px;
+    flex-shrink: 1; /* Запрещаем сжимать */
+}
+
+.search-field {
+    flex-grow: 1; /* Поле поиска будет занимать доступное пространство */
+    min-width: 70px; /* Минимальная ширина поля */
+    padding: 5px 10px;
+    border: 1px solid #ccc;
+    border-radius: 15px 0 0 15px;
+    outline: none;
+    width: 100%;
+    box-sizing: border-box; /* Для правильного расчета ширины */
+}
+
+
+.search-form button {
+    padding: 5px 15px; /* Внутренние отступы для кнопки */
+    border: none; /* Без рамки */
+    background-color: #333; /* Цвет фона кнопки */
+    color: #fff; /* Цвет текста кнопки */
+    cursor: pointer; /* Курсор в виде руки */
+    border-radius: 0 3px 3px 0; /* Закругленные углы на правой стороне кнопки */
+}
+
+.location {
+    position: absolute; /* Абсолютное позиционирование относительно родителя */
+    top: 3px; /* Поднимаем кнопку выше */
+    left: 10px; /* Выравнивание по левому краю */
+    font-size: 12px;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    z-index: 200; /* Поверх других элементов */
+}
+
+
+
+.header-right {
+    display: flex; /* Flexbox для правой части */
+    gap: 10px; /* Промежуток между элементами */
+    align-items: center; /* Выравнивание элементов по вертикали */
+    transition: all 0.3s; /* Плавная анимация для всех изменений */
+}
+
+.header-right button {
+    margin-left: 10px; /* Левый отступ у кнопок */
+    padding: 5px 10px; /* Внутренние отступы */
+    border: none; /* Без рамки */
+    background-color: #333; /* Цвет фона кнопок */
+    color: #fff; /* Цвет текста кнопок */
+    border-radius: 3px; /* Закругленные углы кнопок */
+    cursor: pointer; /* Курсор в виде руки при наведении */
+    transition: background-color 0.3s; /* Плавный переход для фона кнопки */
+}
+
+.header-right button:hover {
+    background-color: #555; /* Цвет фона кнопки при наведении */
+}
+
+.greeting {
+    display: inline-flex; /* Элемент будет располагаться на одной строке с остальными */
+    align-items: center; /* Центрирование текста внутри */
+    white-space: nowrap; /* Запрещает перенос строки внутри этого элемента */
+}
+
+.register-btn {
+    padding: 5px 15px; /* Внутренние отступы для кнопки */
+    border: none; /* Без рамки */
+    background-color: #333; /* Цвет фона кнопки */
+    color: #fff; /* Цвет текста кнопки */
+    cursor: pointer; /* Курсор в виде руки */
+    border-radius: 3px; /* Закругленные углы кнопки */
+    text-decoration: none; /* Убираем подчеркивание */
+    transition: background-color 0.3s; /* Плавный переход для фона кнопки */
+    font-size: 1rem; /* Размер шрифта одинаковый для обеих кнопок */
+    height: 28px; /* Одинаковая высота для обеих кнопок */
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.register-btn:hover {
+    background-color: #555; /* Цвет фона кнопки при наведении */
+}
+
+
+/* Адаптация для мобильных: скрытие кнопок */
+@media (max-width: 1000px) {
+    .header-right > .cart-btn { display: none; } /* Скрывает кнопку корзины */
+}
+
+@media (max-width: 900px) {
+    .header-right > .favorites-btn { display: none; } /* Скрывает кнопку избранного */
+}
+
+@media (max-width: 800px) {
+    .header-right > .register-btn { display: none; } /* Скрывает кнопку регистрации/входа */
+}
+
+@media (max-width: 780px) {
+    .header-right { display: none; } /* Скрывает кнопку местоположения */
+
+}
+
+/* ===================== Адаптация для мобильных ===================== */
+@media (max-width: 768px) {
+    .header {
+        grid-template-columns: 1fr; /* Шапка становится одноуровневой для мобильных */
+        padding: 10px;
+    }
+
+    .header-left {
+        justify-content: space-between; /* Левая часть и меню по краям */
+    }
+
+    .header-center {
+        order: 2; /* Центрируем элемент на втором месте */
+        width: 100%;
+        justify-content: flex-start; /* Выравнивание элементов по левому краю */
+        margin: 10px 0; /* Отступы между блоками */
+    }
+
+    .search-form {
+        max-width: 100%; /* Заставляем форму поиска занимать всю ширину */
+    }
+
+    .header-right {
+        order: 3;
+        width: 100%;
+        justify-content: flex-start;
+        margin-top: 10px;
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+
+    .header-right button {
+        flex: 1;
+        margin-left: 0;
+    }
+}
+
+/* ===================== Баннер ===================== */
+.hero {
+    background-color: #222; /* Фоновый цвет баннера */
+    color: #fff; /* Цвет текста на баннере */
+    text-align: center; /* Выравнивание текста по центру */
+    padding: 80px 20px; /* Внутренние отступы */
+}
+
+.hero h1 {
+    font-size: clamp(1.8rem, 5vw, 2.5rem); /* Динамичный размер шрифта заголовка */
+    margin-bottom: 15px; /* Отступ снизу */
+}
+
+.hero p {
+    font-size: clamp(1rem, 2.5vw, 1.2rem); /* Динамичный размер шрифта для параграфа */
+    margin-bottom: 25px; /* Отступ снизу */
+}
+
+.hero .btn {
+    text-decoration: none; /* Убирает подчеркивание с ссылки */
+    background-color: #ff6b6b; /* Цвет фона кнопки */
+    color: #fff; /* Цвет текста кнопки */
+    padding: 12px 25px; /* Внутренние отступы */
+    border-radius: 5px; /* Закругленные углы */
+    font-weight: bold; /* Жирное начертание текста */
+    transition: background-color 0.3s; /* Плавный переход для фона кнопки */
+}
+
+.hero .btn:hover {
+    background-color: #ff4c4c; /* Цвет фона кнопки при наведении */
+}
+
+/* ===================== Каталог ===================== */
+.catalog {
+    padding: 40px 20px; /* Внутренние отступы для каталога */
+}
+
+.product-grid {
+    display: grid; /* Grid layout для карточек товаров */
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Автоматическая настройка количества колонок */
+    gap: 20px; /* Промежуток между элементами */
+}
+
+.product-card {
+    background-color: #fff; /* Фон карточки товара */
+    border-radius: 5px; /* Закругленные углы */
+    padding: 15px; /* Внутренние отступы */
+    text-align: center; /* Выравнивание контента по центру */
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1); /* Тень вокруг карточки */
+    transition: transform 0.3s; /* Плавная анимация для эффекта hover */
+}
+
+.product-card:hover {
+    transform: translateY(-5px); /* Подъем карточки при наведении */
+}
+
+.product-card img {
+    width: 100%; /* Ширина изображения в карточке */
+    border-radius: 5px; /* Закругленные углы изображения */
+    margin-bottom: 10px; /* Отступ снизу */
+}
+
+.product-card .price {
+    font-weight: bold; /* Жирное начертание для цены */
+    margin: 10px 0; /* Отступы сверху и снизу */
+}
+
+.product-card button {
+    padding: 8px 12px; /* Внутренние отступы кнопки */
+    border: none; /* Без рамки */
+    background-color: #ff6b6b; /* Цвет фона кнопки */
+    color: #fff; /* Цвет текста кнопки */
+    border-radius: 3px; /* Закругленные углы кнопки */
+    cursor: pointer; /* Курсор в виде руки */
+}
+
+.product-card button:hover {
+    background-color: #ff4c4c; /* Цвет фона кнопки при наведении */
+}
+
+/* ===================== Футер ===================== */
+.footer {
+    background-color: #222; /* Фоновый цвет футера */
+    color: #fff; /* Цвет текста футера */
+    text-align: center; /* Выравнивание текста по центру */
+    padding: 30px 20px; /* Внутренние отступы футера */
+    display: flex; /* Flexbox для футера */
+    flex-direction: column; /* Элементы располагаются по вертикали */
+    gap: 15px; /* Промежуток между элементами */
+}
+
+.footer nav a {
+    color: #fff; /* Цвет ссылок */
+    text-decoration: none; /* Убирает подчеркивание */
+    transition: color 0.3s; /* Плавный переход для цвета ссылки */
+}
+
+.footer nav a:hover {
+    color: #ff6b6b; /* Цвет ссылки при наведении */
+}
+
+.footer .social-icons {
+    display: flex; /* Flexbox для соцсетей */
+    justify-content: center; /* Выравнивание по центру */
+    gap: 10px; /* Промежуток между иконками */
+    flex-wrap: wrap; /* Иконки переходят на новую строку при необходимости */
+}
+
+/* ===================== Placeholder ===================== */
+.wave-indicators {
+    display: flex; /* Flexbox для волновых индикаторов */
+    justify-content: center; /* Центрирует индикаторы */
+    margin-top: 20px; /* Отступ сверху */
+}
+
+.wave-indicators span {
+    width: 10px; /* Ширина индикатора */
+    height: 10px; /* Высота индикатора */
+    background-color: #ff6b6b; /* Цвет фона индикаторов */
+    border-radius: 50%; /* Закругленные углы */
+    margin: 0 5px; /* Промежуток между индикаторами */
+}

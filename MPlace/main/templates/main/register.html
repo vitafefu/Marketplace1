@@ -1,0 +1,33 @@
+{% extends 'layout.html' %}
+
+{% block title %}Регистрация - Shop{% endblock %}
+
+{% block content %}
+<section class="register" role="form" style="padding: 50px 20px; max-width: 500px; margin: 0 auto;">
+    <h2 style="text-align:center; margin-bottom: 30px;">Регистрация</h2>
+
+    <form action="" method="POST" style="display:flex; flex-direction:column; gap:15px;">
+        {% csrf_token %}
+        <label for="username">Имя пользователя</label>
+        <input type="text" id="username" name="username" placeholder="Введите имя пользователя" required
+               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="Введите email" required
+               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+
+        <label for="password">Пароль</label>
+        <input type="password" id="password" name="password" placeholder="Введите пароль" required
+               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+
+        <button type="submit" style="padding:12px; background-color:#ff6b6b; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; transition: background-color 0.3s;">
+            Зарегистрироваться
+        </button>
+    </form>
+
+    <p style="margin-top:20px; text-align:center;">
+        Уже есть аккаунт?
+        <a href="{% url 'login' %}" style="color:#ff6b6b; text-decoration:none;">Войти</a>
+    </p>
+</section>
+{% endblock %}
