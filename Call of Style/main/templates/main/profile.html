@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block title %}Личный кабинет - Shop{% endblock %}
+
+{% block content %}
+<section style="padding: 50px 20px; max-width: 800px; margin: 0 auto;">
+    <h2 style="text-align:center; margin-bottom: 30px;">Личный кабинет</h2>
+
+    <div style="background: white; padding: 20px; border-radius: 5px; box-shadow: 0 2px 6px rgba(0,0,0,0.1);">
+        <p><strong>Имя пользователя:</strong> {{ user.username }}</p>
+        <p><strong>Email:</strong> {{ user.email }}</p>
+
+        <div style="margin-top: 30px;">
+            <h3>Настройки аватара</h3>
+            <p>Функция смены аватара появится скоро!</p>
+        </div>
+    </div>
+</section>
+{% endblock %}

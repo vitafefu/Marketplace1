@@ -1,0 +1,81 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Shop{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'main/css/styles.css' %}">
+</head>
+<body>
+
+<!-- ===================== Шапка ===================== -->
+<header class="header">
+    <div class="header-left">
+        <button class="location">Местоположение</button>
+        <button class="menu-btn" aria-label="Меню">☰</button>
+        <div class="logo-mini">Logo</div>
+    </div>
+
+    <div class="header-center">
+        <form action="#" class="search-form">
+            <input type="text" class="search-field" placeholder="Поиск товаров..." aria-label="Поиск">
+            <button type="submit">Найти</button>
+        </form>
+    </div>
+
+    <div class="header-right">
+         {% if user.is_authenticated %}
+        <a href="{% url 'profile' %}" class="user-greeting" title="Перейти в личный кабинет">
+            {% if user.profile.avatar %}
+                <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="user-avatar">
+            {% else %}
+                <div class="default-avatar">👤</div>
+            {% endif %}
+            Привет, {{ user.username }}!
+        </a>
+            <form method="POST" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="register-btn">Выйти</button>
+            </form>
+        {% else %}
+            {% if request.path != '/login/' %}
+                <a href="{% url 'login' %}" class="register-btn">Вход</a>
+            {% endif %}
+        {% endif %}
+        <button class="favorites-btn" aria-label="Понравившееся">❤</button>
+        <button class="cart-btn" aria-label="Корзина">🛒</button>
+    </div>
+</header>
+
+<!-- ===================== Контент ===================== -->
+{% block content %}{% endblock %}
+
+<!-- ===================== Подвал ===================== -->
+<footer class="footer">
+    <section class="stay-connected">
+        <h2>Оставайтесь на связи</h2>
+        <p>Присоединяйтесь к нам в соцсетях и следите за обновлениями.</p>
+        <nav class="social-icons" aria-label="Соцсети">
+            <a href="#" aria-label="Telegram">✈️</a>
+            <a href="#" aria-label="Instagram">📷</a>
+            <a href="#" aria-label="VK">🖖</a>
+        </nav>
+    </section>
+
+    <p>&copy; <span id="year"></span> Shop.</p>
+    <nav aria-label="Юридические ссылки">
+        <a href="#">Политика конфиденциальности</a> |
+        <a href="#">Пользовательское соглашение</a>
+    </nav>
+    <address>Контакты: <a href="mailto:info@shop.ru">info@shop.ru</a></address>
+</footer>
+
+<script src="{% static 'main/js/script.js' %}"></script>
+
+<script>
+    document.getElementById('year').textContent = new Date().getFullYear();
+</script>
+
+</body>
+</html>
