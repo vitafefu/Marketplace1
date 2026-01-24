@@ -686,125 +686,172 @@ def cities_suggest(request):
 # =========================
 # API: register
 # =========================
-@method_decorator(csrf_exempt, name='dispatch')
 class RegisterView(View):
     def post(self, request):
+        wants_json = (
+                request.headers.get('x-requested-with') == 'XMLHttpRequest'
+                or 'application/json' in (request.headers.get('Accept') or '')
+        )
+
+        def respond(payload, status=200):
+            if wants_json:
+                return JsonResponse(payload, status=status)
+            messages.error(request, payload.get('message') or 'Ошибка регистрации')
+            return redirect('register')
+
         try:
-            data = json.loads(request.body)
+            if request.content_type and 'application/json' in request.content_type:
+                data = json.loads(request.body.decode('utf-8') or '{}')
+            else:
+                data = request.POST
+        except json.JSONDecodeError:
+            return respond({'ok': False, 'errors': {'__all__': ['Некорректный JSON']}}, status=400)
 
-            email = (data.get('email') or '').strip().lower()
-            password = data.get('password') or ''
-            name = (data.get('name') or '').strip()
+        email = (data.get('email') or '').strip().lower()
+        password = data.get('password') or ''
+        name = (data.get('name') or '').strip()
+        phone_raw = (data.get('phone') or '').strip()
+        country_id_raw = (data.get('country_id') or '').strip()
+        city_id_raw = (data.get('city_id') or '').strip()
+        birth_date_str = (data.get('birth_date') or '').strip()
+        gender = (data.get('gender') or '').strip()
 
-            phone_raw = (data.get('phone') or '').strip()
-            country_id = data.get('country_id')
-            city_id = data.get('city_id')
-            birth_date_str = (data.get('birth_date') or '').strip()
-            gender = (data.get('gender') or '').strip()
-            errors = {}
+        allowed_domains = {
+            'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com',
+            'icloud.com', 'me.com', 'mac.com', 'proton.me', 'protonmail.com',
+            'aol.com', 'yandex.ru', 'ya.ru', 'mail.ru', 'list.ru',
+            'bk.ru', 'inbox.ru', 'rambler.ru',
+        }
 
-            # обязательные поля
-            if not email: errors['email'] = 'Введите email'
-            if not password: errors['password'] = 'Введите пароль'
-            if not name: errors['name'] = 'Введите имя'
-            if not phone_raw: errors['phone'] = 'Введите номер телефона'
-            if not country_id: errors['country'] = 'Выберите страну из подсказки'
-            if not city_id: errors['city'] = 'Выберите город из подсказки'
-            if not birth_date_str: errors['birth_date'] = 'Введите дату рождения'
-            if not gender: errors['gender'] = 'Выберите пол'
+        errors: dict[str, list[str]] = {}
 
-            # email
-            if email and '@' not in email:
-                errors['email'] = 'Введите корректный email адрес'
+        def add_error(field: str, message: str):
+            errors.setdefault(field, []).append(message)
 
-            # имя
-            text_pattern = re.compile(r'^[A-Za-zА-Яа-яЁё\s\-]+$')
-            if name and (not text_pattern.match(name) or len(name) < 2):
-                errors['name'] = 'Имя: только буквы, пробелы и дефисы (минимум 2 символа)'
+        # обязательные поля
+        if not email:
+            add_error('email', 'Введите email')
+        if not password:
+            add_error('password', 'Введите пароль')
+        if not name:
+            add_error('name', 'Введите имя')
+        if not phone_raw:
+            add_error('phone', 'Введите номер телефона')
+        if not country_id_raw:
+            add_error('country', 'Выберите страну из подсказки')
+        if not city_id_raw:
+            add_error('city', 'Выберите город из подсказки')
+        if not birth_date_str:
+            add_error('birth_date', 'Введите дату рождения')
+        if not gender:
+            add_error('gender', 'Выберите пол')
 
-            # дата рождения
-            birth_date = None
-            if birth_date_str:
-                try:
-                    birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
-                    today = date.today()
+        # email
+        email_pattern = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+        if email and not email_pattern.match(email):
+            add_error('email', 'Введите корректный email адрес')
+        if email:
+            domain = email.split('@')[-1].lower()
+            if domain not in allowed_domains:
+                add_error('email', 'Разрешены только популярные почтовые домены')
+
+        # пароль
+        if password and len(password) < 6:
+            add_error('password', 'Пароль должен быть минимум 6 символов')
+
+        # имя
+        text_pattern = re.compile(r'^[A-Za-zА-Яа-яЁё]+(?:[\s-][A-Za-zА-Яа-яЁё]+)*$')
+        if name.startswith(' '):
+            add_error('name', 'Не начинайте с пробела')
+        if name and (len(name.strip()) < 2 or not text_pattern.match(name.strip())):
+            add_error('name', 'Имя: только буквы, пробелы и дефисы (минимум 2 символа)')
+
+        # дата рождения
+        birth_date = None
+        if birth_date_str:
+            try:
+                birth_date = datetime.strptime(birth_date_str, '%Y-%m-%d').date()
+                today = date.today()
+                if birth_date > today or birth_date < date(1900, 1, 1):
+                    add_error('birth_date', 'Введите корректную дату рождения')
+                else:
                     age = today.year - birth_date.year - (
                         (today.month, today.day) < (birth_date.month, birth_date.day)
                     )
                     if age < 14:
-                        errors['birth_date'] = 'Вам должно быть не менее 14 лет'
-                    if birth_date < date(1900, 1, 1) or birth_date > today:
-                        errors['birth_date'] = 'Введите корректную дату рождения'
-                except (ValueError, TypeError):
-                    errors['birth_date'] = 'Введите корректную дату рождения'
+                        add_error('birth_date', 'Вам должно быть не менее 14 лет')
+            except (ValueError, TypeError):
+                        add_error('birth_date', 'Введите корректную дату рождения')
 
-            if not gender:
-                errors['gender'] = 'Выберите пол'
+        if gender and gender not in {'male', 'female'}:
+            add_error('gender', 'Выберите пол')
 
-            # early exit
-            if errors:
-                return JsonResponse({'success': False, 'errors': errors}, status=400)
+        # early exit
+        if errors:
+            return respond({'ok': False, 'errors': errors}, status=400)
+        # достаём страну/город по id
+        try:
+            country_id = int(country_id_raw)
+            country_obj = Country.objects.get(id=country_id, is_active=True)
+        except (ValueError, TypeError, Country.DoesNotExist):
+            return respond({'ok': False, 'errors': {'country': ['Страна не найдена']}}, status=400)
 
-            # достаём страну/город по id
-            try:
-                country_obj = Country.objects.get(id=int(country_id), is_active=True)
-            except Exception:
-                return JsonResponse({'success': False, 'errors': {'country': 'Страна не найдена'}}, status=400)
+        try:
+            city_id = int(city_id_raw)
+            city_obj = City.objects.get(id=city_id, is_active=True)
+        except (ValueError, TypeError, City.DoesNotExist):
+            return respond({'ok': False, 'errors': {'city': ['Город не найден']}}, status=400)
 
-            try:
-                city_obj = City.objects.get(id=int(city_id), is_active=True)
-            except Exception:
-                return JsonResponse({'success': False, 'errors': {'city': 'Город не найден'}}, status=400)
+        # проверяем что город реально принадлежит стране
+        if city_obj.country_id != country_obj.id:
+            return respond({'ok': False, 'errors': {'city': ['Город не относится к выбранной стране']}}, status=400)
 
-            # проверяем что город реально принадлежит стране
-            if city_obj.country_id != country_obj.id:
-                return JsonResponse({'success': False, 'errors': {'city': 'Город не относится к выбранной стране'}}, status=400)
+        # телефон
+        phone = normalize_phone_any(phone_raw)
+        if not phone:
+            return respond({'ok': False, 'errors': {'phone': ['Введите корректный номер телефона']}}, status=400)
 
-            # телефон
-            phone = normalize_phone_any(phone_raw)
-            if not phone:
-                return JsonResponse({'success': False, 'errors': {'phone': 'Введите корректный номер телефона'}}, status=400)
-
-            if not validate_phone_by_country_code(phone, country_obj.phone_code):
-                msg = f'Телефон должен начинаться с {country_obj.phone_code}' if country_obj.phone_code else 'Введите корректный телефон'
-                return JsonResponse({'success': False, 'errors': {'phone': msg}}, status=400)
-
-            # уникальность
-            if CustomUser.objects.filter(email__iexact=email).exists():
-                return JsonResponse({'success': False, 'errors': {'email': 'Пользователь с таким email уже существует'}}, status=400)
-
-            if CustomUser.objects.filter(phone=phone).exists():
-                return JsonResponse({'success': False, 'errors': {'phone': 'Пользователь с таким номером телефона уже существует'}}, status=400)
-
-            # создаём пользователя
+        if not validate_phone_by_country_code(phone, country_obj.phone_code):
+            msg = (
+                f'Телефон должен начинаться с {country_obj.phone_code}'
+                if country_obj.phone_code else 'Введите корректный телефон'
+            )
+            return respond({'ok': False, 'errors': {'phone': [msg]}}, status=400)
+        # уникальность
+        if CustomUser.objects.filter(email__iexact=email).exists():
+            return respond({'ok': False, 'errors': {'email': ['Пользователь с таким email уже существует']}}, status=400)
+        if CustomUser.objects.filter(phone=phone).exists():
+            return respond({'ok': False, 'errors': {'phone': ['Пользователь с таким номером телефона уже существует']}}, status=400)
+        # создаём пользователя
+        try:
             user = CustomUser.objects.create_user(
                 email=email,
                 password=password,
-                first_name=name,
+                first_name=name.strip(),
                 phone=phone,
                 country=country_obj,
                 city=city_obj,
                 birth_date=birth_date,
-                birth_year=birth_date.year if birth_date else None
+                birth_year=birth_date.year if birth_date else None,
             )
             prof, _ = Profile.objects.get_or_create(user=user)
             prof.gender = gender
             prof.save()
             login(request, user)
 
-            return JsonResponse({
-                'success': True,
-                'redirect': '/index/',
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'name': user.first_name,
-                    'phone': user.phone,
-                    'country': country_obj.name,
-                    'city': city_obj.name,
-                    'birth_date': user.birth_date.isoformat() if user.birth_date else birth_date_str
-                }
-            })
+        except Exception as exc:
+            return respond({'ok': False, 'errors': {'__all__': [f'Ошибка регистрации: {exc}']}}, status=500)
 
-        except Exception as e:
-            return JsonResponse({'success': False, 'message': f'Ошибка регистрации: {str(e)}'}, status=500)
+        return respond({
+            'ok': True,
+            'redirect': '/profile/',
+            'user': {
+                'id': user.id,
+                'email': user.email,
+                'name': user.first_name,
+                'phone': user.phone,
+                'country': country_obj.name,
+                'city': city_obj.name,
+                'birth_date': user.birth_date.isoformat() if user.birth_date else birth_date_str,
+            }
+        })

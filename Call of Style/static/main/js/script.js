@@ -215,17 +215,52 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 // ================= Ошибки (tooltip) =====================
+const FIELD_ERROR_HIDE_MS = 1500;
+const fieldErrorTimers = new Map();
 function clearFieldErrors(form) {
   if (!form) return;
   form.querySelectorAll('.field-error-tooltip').forEach((el) => el.remove());
   form.querySelectorAll('.field-error').forEach((el) => el.remove());
   form.querySelectorAll('.error').forEach((el) => el.classList.remove('error'));
+  form.querySelectorAll('[data-has-error="1"]').forEach((el) => {
+    el.dataset.hasError = '0';
+  });
+  fieldErrorTimers.forEach((timerId) => clearTimeout(timerId));
+  fieldErrorTimers.clear();
 }
 
-function showFieldError(inputEl, message) {
+function clearFieldError(inputEl, { keepTouched = true } = {}) {
   if (!inputEl) return;
 
+  const timerId = fieldErrorTimers.get(inputEl);
+  if (timerId) {
+    clearTimeout(timerId);
+    fieldErrorTimers.delete(inputEl);
+  }
+
+  inputEl.classList.remove('error');
+  inputEl.dataset.hasError = '0';
+
+  const wrap = inputEl.closest('.input-with-error');
+  if (!wrap) return;
+  wrap.querySelectorAll('.field-error-tooltip').forEach((el) => el.remove());
+  wrap.querySelectorAll('.field-error').forEach((el) => el.remove());
+
+  if (!keepTouched) {
+    inputEl.dataset.touched = '0';
+  }
+}
+
+function showFieldError(inputEl, message, { autoHide = true } = {}) {
+  if (!inputEl) return;
+  const msg = (message || '').toString().trim();
+  if (!msg) return;
+
+  clearFieldError(inputEl);
+
   inputEl.classList.add('error');
+  inputEl.dataset.hasError = '1';
+
 
   // обертка для tooltip
   let wrap = inputEl.closest('.input-with-error');
@@ -238,8 +273,97 @@ function showFieldError(inputEl, message) {
 
   const tooltip = document.createElement('div');
   tooltip.className = 'field-error-tooltip';
-  tooltip.innerHTML = `<div class="field-error-tooltip-content">${message}</div>`;
+  tooltip.innerHTML = `<div class="field-error-tooltip-content">${msg}</div>`;
   wrap.appendChild(tooltip);
+  if (!autoHide) return;
+
+  const timerId = setTimeout(() => {
+    clearFieldError(inputEl);
+  }, FIELD_ERROR_HIDE_MS);
+
+  fieldErrorTimers.set(inputEl, timerId);
+}
+
+function debounce(fn, wait = 150) {
+  let timeoutId = null;
+  return (...args) => {
+    clearTimeout(timeoutId);
+    timeoutId = setTimeout(() => fn(...args), wait);
+  };
+}
+
+function collapseInnerSpaces(value) {
+  return value.replace(/\s{2,}/g, ' ');
+}
+
+function preventLeadingSpace(inputEl, message = 'Не начинайте с пробела') {
+  if (!inputEl) return;
+
+  inputEl.addEventListener('keydown', (e) => {
+    if (e.key === ' ' && !inputEl.value) {
+      e.preventDefault();
+      showFieldError(inputEl, message);
+    }
+  });
+
+  inputEl.addEventListener('input', () => {
+    const original = inputEl.value || '';
+    const withoutLeading = original.replace(/^\s+/, '');
+    const normalized = collapseInnerSpaces(withoutLeading);
+
+    if (normalized !== original) {
+      const pos = inputEl.selectionStart ?? normalized.length;
+      inputEl.value = normalized;
+      const nextPos = Math.min(pos, normalized.length);
+      inputEl.setSelectionRange(nextPos, nextPos);
+    }
+  });
+}
+
+function attachLiveValidation(inputEl, validator, { debounceMs = 180 } = {}) {
+  if (!inputEl || typeof validator !== 'function') return;
+
+  const runValidation = () => validator(inputEl.value, { fromBlur: false, fromInput: false });
+  const runValidationDebounced = debounce(() => validator(inputEl.value, { fromBlur: false, fromInput: true }), debounceMs);
+
+  inputEl.addEventListener('focus', () => clearFieldError(inputEl));
+
+  inputEl.addEventListener('blur', () => {
+    inputEl.dataset.touched = '1';
+    validator(inputEl.value, { fromBlur: true, fromInput: false });
+  });
+
+  inputEl.addEventListener('input', () => {
+    if (inputEl.dataset.hasError === '1') {
+      clearFieldError(inputEl);
+    }
+    if (inputEl.dataset.touched === '1') {
+      runValidationDebounced();
+    }
+  });
+
+  // стартовое состояние
+  runValidation();
+}
+
+function scrollToFirstError(form) {
+  if (!form) return;
+  const firstError = form.querySelector('.error');
+  if (!firstError) return;
+  firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (typeof firstError.focus === 'function') {
+    firstError.focus({ preventScroll: true });
+  }
+}
+
+function getCookie(name) {
+  const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+  return match ? match.pop() : '';
+}
+
+function parseAcceptsJson(request) {
+  const accept = request.headers.get('Accept') || '';
+  return accept.includes('application/json');
 }
 
 // ================= Валидаторы =====================
@@ -266,7 +390,7 @@ const validateEmail = (email) => {
     'gmail.com','outlook.com','hotmail.com','yahoo.com',
     'icloud.com','me.com','mac.com','proton.me','protonmail.com',
     'aol.com','yandex.ru','ya.ru','mail.ru','list.ru',
-    'bk.ru','inbox.ru','rambler.ru'
+    'bk.ru','inbox.ru','rambler.ru','dvfu.ru'
   ];
 
   const domain = (email.split('@')[1] || '').toLowerCase();
@@ -317,6 +441,107 @@ const validatePhoneByCountryCode = (phone, phoneCode) => {
   return /^\+\d{10,15}$/.test(p);
 };
 
+const phoneMasks = {
+  '+7': {
+    placeholder: '+7 (999) 999-99-99',
+    groups: [3, 3, 2, 2],
+    separators: [' (', ') ', '-', '-'],
+    end: '',
+  },
+  '+40': {
+    placeholder: '+40 999 999 999',
+    groups: [3, 3, 3],
+    separators: [' ', ' ', ''],
+    end: '',
+  },
+};
+
+function getDigits(value) {
+  return (value || '').replace(/\D/g, '');
+}
+
+function stripPhoneCode(digits, phoneCode) {
+  const codeDigits = getDigits(phoneCode);
+  if (!codeDigits) return digits;
+  return digits.startsWith(codeDigits) ? digits.slice(codeDigits.length) : digits;
+}
+
+function applyGroupedMask(baseCode, restDigits, maskConfig) {
+  const digits = restDigits.slice(0, maskConfig.groups.reduce((a, b) => a + b, 0));
+  let out = baseCode;
+  let idx = 0;
+
+  maskConfig.groups.forEach((size, groupIdx) => {
+    if (idx >= digits.length) return;
+    const chunk = digits.slice(idx, idx + size);
+    if (!chunk) return;
+    out += (maskConfig.separators[groupIdx] || '') + chunk;
+    idx += chunk.length;
+  });
+
+  if (idx >= digits.length && maskConfig.end) {
+    out += maskConfig.end;
+  }
+
+  return out.trim();
+}
+
+function formatPhoneForCode(rawValue, phoneCode) {
+  const code = (phoneCode || '').trim();
+  const digits = getDigits(rawValue);
+  const maskConfig = phoneMasks[code];
+
+  if (!digits && code) return code;
+  if (!digits) return '';
+
+  const baseCode = code || '+';
+  const baseDigits = getDigits(baseCode);
+
+  if (maskConfig && baseDigits) {
+    const restDigits = stripPhoneCode(digits, code);
+    return applyGroupedMask(code, restDigits, maskConfig);
+  }
+
+  // fallback: просто + и группы по 3
+  const capped = digits.slice(0, 15);
+  const chunks = capped.match(/.{1,3}/g) || [];
+  return '+' + chunks.join(' ').trim();
+}
+
+function syncPhoneMaskWithCode(phoneEl, phoneCodeEl) {
+  if (!phoneEl || !phoneCodeEl) return;
+
+  const update = () => {
+    const code = (phoneCodeEl.value || '').trim();
+    const maskConfig = phoneMasks[code];
+    phoneEl.placeholder = maskConfig?.placeholder || (code ? `${code}...` : '+...');
+
+    const formatted = formatPhoneForCode(phoneEl.value, code);
+    phoneEl.value = formatted;
+  };
+
+  phoneEl.addEventListener('focus', () => {
+    const code = (phoneCodeEl.value || '').trim();
+    if (!phoneEl.value && code) {
+      phoneEl.value = code;
+    }
+  });
+
+  phoneEl.addEventListener('input', () => {
+    const code = (phoneCodeEl.value || '').trim();
+    const formatted = formatPhoneForCode(phoneEl.value, code);
+    phoneEl.value = formatted;
+  });
+
+  phoneCodeEl.addEventListener('change', update);
+  update();
+}
+
+function validateGenderValue(form) {
+  const genderValue = form.querySelector('input[name="gender"]:checked')?.value || '';
+  return ['male', 'female'].includes(genderValue) ? genderValue : '';
+}
+
 // =================== SUGGEST HELPERS ===================
 function hideBox(box) {
   if (!box) return;
@@ -346,229 +571,402 @@ function renderSuggest(box, items, onPick) {
   box.style.display = 'block';
 }
 
+// =================== COUNTRY / CITY / REGISTER ===================
+document.addEventListener('DOMContentLoaded', () => {
+  const regForm = document.getElementById('register-form');
+  if (!regForm) return;
+
+  const nameInput = regForm.querySelector('input[name="name"]');
+  const emailInput = regForm.querySelector('input[name="email"]');
+  const countryInput = document.getElementById('country-input');
+  const cityInput = document.getElementById('city-input');
+  const phoneInput = document.getElementById('phone-input');
+  const birthDateInput = regForm.querySelector('input[name="birth_date"]');
+  const passwordInput = regForm.querySelector('input[name="password"]');
+  const genderInputs = Array.from(regForm.querySelectorAll('input[name="gender"]'));
+
+  const countryIdInput = document.getElementById('country-id');
+  const cityIdInput = document.getElementById('city-id');
+  const phoneCodeInput = document.getElementById('phone-code');
+
+  const countrySuggestBox = document.getElementById('country-suggest');
+  const citySuggestBox = document.getElementById('city-suggest');
+
+  const countryErrorMessage = 'Выберите страну из подсказки';
+  const cityErrorMessage = 'Выберите город из подсказки';
+
+  // запрет первого пробела и нормализация
+  [nameInput, countryInput, cityInput].forEach((inputEl) => preventLeadingSpace(inputEl));
+
+  // маска телефона
+  syncPhoneMaskWithCode(phoneInput, phoneCodeInput);
+
+  const normalizeTextInput = (inputEl) => {
+    if (!inputEl) return '';
+    const withoutLeading = (inputEl.value || '').replace(/^\s+/, '');
+    const collapsed = collapseInnerSpaces(withoutLeading);
+    inputEl.value = collapsed;
+    return collapsed.trim();
+  };
+
+const validateCityBinding = ({ show = true } = {}) => {
+    if (!cityInput || !cityIdInput) return true;
+    const value = normalizeTextInput(cityInput);
+    const ok = !!cityIdInput.value && !!value;
+    if (!ok && show) showFieldError(cityInput, cityErrorMessage);
+    if (ok) clearFieldError(cityInput);
+    return ok;
+  };
+
+const validateCountryBinding = ({ show = true } = {}) => {
+  if (!countryInput || !countryIdInput) return true;
+  const value = normalizeTextInput(countryInput);
+  const ok = !!countryIdInput.value && !!value;
+  if (!ok && show) showFieldError(countryInput, countryErrorMessage);
+  if (ok) clearFieldError(countryInput);
+  return ok;
+};
+
+const validators = new Map([
+    [nameInput, () => {
+      const value = normalizeTextInput(nameInput);
+      if (!value) return true;
+      if (!validateName(value)) {
+        showFieldError(nameInput, 'Имя: только буквы, пробел, дефис (от 2 символов)');
+        return false;
+      }
+      clearFieldError(nameInput);
+      return true;
+    }],
+    [emailInput, () => {
+      const value = (emailInput?.value || '').trim().toLowerCase();
+      if (emailInput) emailInput.value = value;
+      if (!value) return true;
+      if (!validateEmail(value)) {
+        showFieldError(emailInput, 'Введите email (только разрешённые домены)');
+        return false;
+      }
+      clearFieldError(emailInput);
+      return true;
+    }],
+    [phoneInput, () => {
+      const phoneCode = (phoneCodeInput?.value || '').trim();
+      const value = phoneInput?.value || '';
+      if (!value.trim()) return true;
+      if (!validatePhoneByCountryCode(value, phoneCode)) {
+        showFieldError(
+          phoneInput,
+          phoneCode
+            ? `Телефон должен начинаться с ${phoneCode} и быть корректным`
+            : 'Введите корректный телефон (+ и 10–15 цифр)'
+        );
+        return false;
+      }
+      clearFieldError(phoneInput);
+      return true;
+    }],
+    [birthDateInput, () => {
+      const value = birthDateInput?.value || '';
+      if (!value) return true;
+      if (!validateBirthDate(value)) {
+        showFieldError(birthDateInput, 'Возраст должен быть 14+ и дата корректная');
+        return false;
+      }
+      clearFieldError(birthDateInput);
+      return true;
+    }],
+    [passwordInput, () => {
+      const value = passwordInput?.value || '';
+      if (!value) return true;
+      if (!validatePassword(value)) {
+        showFieldError(passwordInput, 'Пароль минимум 6 символов');
+        return false;
+      }
+      clearFieldError(passwordInput);
+      return true;
+    }],
+  ]);
+
+  validators.forEach((validator, inputEl) => attachLiveValidation(inputEl, validator));
+
+  if (countryInput && countryIdInput) {
+    countryInput.addEventListener('focus', () => clearFieldError(countryInput));
+    countryInput.addEventListener('blur', () => validateCountryBinding({ show: true }));
+    countryInput.addEventListener('input', () => {
+      countryIdInput.value = '';
+      if (phoneCodeInput) phoneCodeInput.value = '';
+      if (cityInput) cityInput.value = '';
+      if (cityIdInput) cityIdInput.value = '';
+      if (phoneCodeInput) phoneCodeInput.dispatchEvent(new Event('change'));
+    });
+  }
+
+if (cityInput && cityIdInput) {
+    cityInput.addEventListener('focus', () => clearFieldError(cityInput));
+    cityInput.addEventListener('blur', () => validateCityBinding({ show: true }));
+    cityInput.addEventListener('input', () => {
+      cityIdInput.value = '';
+    });
+  }
+  genderInputs.forEach((inputEl) => {
+    inputEl.addEventListener('focus', () => {
+      const genderWrap = document.getElementById('gender-group');
+      if (genderWrap) genderWrap.classList.remove('error');
+    });
+    inputEl.addEventListener('change', () => {
+      const genderWrap = document.getElementById('gender-group');
+      if (genderWrap) genderWrap.classList.remove('error');
+    });
+  });
 // =================== COUNTRY SUGGEST ===================
-let selectedCountryId = null;
-let selectedCountryPhoneCode = '';
-const countryInput = document.getElementById('country-input');
-const countryIdInput = document.getElementById('country-id');
-const phoneCodeInput = document.getElementById('phone-code');
-const countrySuggestBox = document.getElementById('country-suggest');
-
-const cityInput = document.getElementById('city-input');
-const cityIdInput = document.getElementById('city-id');
-const citySuggestBox = document.getElementById('city-suggest');
-
-const phoneInput = document.getElementById('phone-input');
-
 let tCountry = null;
 
 async function fetchCountries(q) {
-  const res = await fetch(`/api/countries/?q=${encodeURIComponent(q)}`);
-  const data = await res.json().catch(() => ({ results: [] }));
-  return data.results || [];
-}
+    const res = await fetch(`/api/countries/?q=${encodeURIComponent(q)}`, {
+      headers: { Accept: 'application/json' },
+    });
+    const data = await res.json().catch(() => ({ results: [] }));
+    return data.results || [];
+  }
+  function resetCountryBinding() {
+    if (countryIdInput) countryIdInput.value = '';
+    if (phoneCodeInput) phoneCodeInput.value = '';
 
-function resetCountryBinding() {
-  if (countryIdInput) countryIdInput.value = '';
-  if (phoneCodeInput) phoneCodeInput.value = '';
+     // сбрасываем город (потому что без страны город невалиден)
+    if (cityInput) cityInput.value = '';
+    if (cityIdInput) cityIdInput.value = '';
+    hideBox(citySuggestBox);
+  }
 
-  // сбрасываем город (потому что без страны город невалиден)
-  if (cityInput) cityInput.value = '';
-  if (cityIdInput) cityIdInput.value = '';
-  hideBox(citySuggestBox);
-}
+    if (countryInput && countrySuggestBox) {
+    countryInput.addEventListener('input', () => {
+      clearTimeout(tCountry);
+      const q = (countryInput.value || '').trim();
 
-if (countryInput && countrySuggestBox) {
-  countryInput.addEventListener('input', () => {
-    clearTimeout(tCountry);
-    const q = (countryInput.value || '').trim();
+         resetCountryBinding();
+      if (phoneCodeInput) phoneCodeInput.dispatchEvent(new Event('change'));
+      if (q.length < 1) return hideBox(countrySuggestBox);
 
-    resetCountryBinding();
+      tCountry = setTimeout(async () => {
+        try {
+          const items = await fetchCountries(q);
 
-    if (q.length < 1) return hideBox(countrySuggestBox);
+            renderSuggest(countrySuggestBox, items, (item) => {
+            countryInput.value = item.name;
 
-    tCountry = setTimeout(async () => {
-      try {
-        const items = await fetchCountries(q);
+            // фиксируем id + phone_code
+            if (countryIdInput) countryIdInput.value = String(item.id || '');
+            if (phoneCodeInput) phoneCodeInput.value = (item.phone_code || '').trim();
+            if (phoneCodeInput) phoneCodeInput.dispatchEvent(new Event('change'));
 
-        renderSuggest(countrySuggestBox, items, (item) => {
-          countryInput.value = item.name;
+  clearFieldError(countryInput);
+            validateCountryBinding({ show: false });
+          });
+        } catch {
+          hideBox(countrySuggestBox);
+        }
+      }, 150);
+    });
 
-          // фиксируем id + phone_code
-          if (countryIdInput) countryIdInput.value = String(item.id || '');
-          if (phoneCodeInput) phoneCodeInput.value = (item.phone_code || '').trim();
-
-          // улучшаем UX телефона
-          const pc = (item.phone_code || '').trim();
-          if (phoneInput) {
-            phoneInput.placeholder = pc ? `${pc}...` : '+...';
-
-            const current = (phoneInput.value || '').trim();
-            // если пусто — подставим код
-            if (!current && pc) phoneInput.value = pc;
-          }
-        });
-
-      } catch {
-        hideBox(countrySuggestBox);
-      }
-    }, 150);
-  });
-
-  countryInput.addEventListener('blur', () => setTimeout(() => hideBox(countrySuggestBox), 150));
-}
+countryInput.addEventListener('blur', () => setTimeout(() => hideBox(countrySuggestBox), 150));
+  }
 
 // =================== CITY SUGGEST (фильтр по стране) ===================
 let tCity = null;
 
 async function fetchCities(q, countryId) {
-  const url = `/api/cities/?q=${encodeURIComponent(q)}&country_id=${encodeURIComponent(countryId || '')}`;
-  const res = await fetch(url);
-  const data = await res.json().catch(() => ({ results: [] }));
-  return data.results || [];
-}
+    const url = `/api/cities/?q=${encodeURIComponent(q)}&country_id=${encodeURIComponent(countryId || '')}`;
+    const res = await fetch(url, { headers: { Accept: 'application/json' } });
+    const data = await res.json().catch(() => ({ results: [] }));
+    return data.results || [];
+  }
 
-if (cityInput && citySuggestBox) {
-  cityInput.addEventListener('input', () => {
-    clearTimeout(tCity);
-    const q = (cityInput.value || '').trim();
+    if (cityInput && citySuggestBox) {
+    cityInput.addEventListener('input', () => {
+      clearTimeout(tCity);
+      const q = (cityInput.value || '').trim();
 
     if (cityIdInput) cityIdInput.value = '';
 
-    const countryId = countryIdInput ? countryIdInput.value : '';
+        const countryId = countryIdInput ? countryIdInput.value : '';
 
     // если страна не выбрана — не даём город
-    if (!countryId) {
-      hideBox(citySuggestBox);
-      return;
-    }
+      if (!countryId) {
+        hideBox(citySuggestBox);
+        return;
+      }
 
     if (q.length < 1) return hideBox(citySuggestBox);
 
-    tCity = setTimeout(async () => {
-      try {
-        const items = await fetchCities(q, countryId);
+        tCity = setTimeout(async () => {
+        try {
+          const items = await fetchCities(q, countryId);
 
-        renderSuggest(citySuggestBox, items, (item) => {
-          cityInput.value = item.name;
-          if (cityIdInput) cityIdInput.value = String(item.id || '');
-        });
+      renderSuggest(citySuggestBox, items, (item) => {
+            cityInput.value = item.name;
+            if (cityIdInput) cityIdInput.value = String(item.id || '');
+            clearFieldError(cityInput);
+            validateCityBinding({ show: false });
+          });
+        } catch {
+          hideBox(citySuggestBox);
+        }
+      }, 150);
+    });
 
-      } catch {
-        hideBox(citySuggestBox);
-      }
-    }, 150);
-  });
-
-  cityInput.addEventListener('blur', () => setTimeout(() => hideBox(citySuggestBox), 150));
-}
+    cityInput.addEventListener('blur', () => setTimeout(() => hideBox(citySuggestBox), 150));
+  }
 
 // ================= Регистрация submit =====================
-const regForm = document.getElementById('register-form');
+const getFieldByName = (name) => regForm.querySelector(`[name="${name}"]`);
 
-if (regForm) {
+function showErrorsFromServer(errors) {
+  if (!errors) return;
+
+    const fieldMap = {
+      name: nameInput,
+      email: emailInput,
+      country: countryInput,
+      country_id: countryInput,
+      city: cityInput,
+      city_id: cityInput,
+      phone: phoneInput,
+      birth_date: birthDateInput,
+      gender: document.getElementById('gender-group'),
+      password: passwordInput,
+    };
+
+    Object.entries(errors).forEach(([field, messages]) => {
+      const msg = Array.isArray(messages) ? messages[0] : messages;
+      if (!msg) return;
+
+      if (field === '__all__') {
+        showFieldError(emailInput, msg);
+        return;
+      }
+      if (field === 'gender') {
+       const genderWrap = document.getElementById('gender-group');
+       if (genderWrap) {
+         genderWrap.classList.add('error');
+         showFieldError(genderInputs[0], msg, { autoHide: true });
+       }
+       return;
+     }
+
+const target = fieldMap[field] || getFieldByName(field);
+      showFieldError(target, msg);
+    });
+  }
+
+function runClientValidation({ requireAll = false } = {}) {
+    const email = (emailInput?.value || '').trim().toLowerCase();
+    const password = passwordInput?.value || '';
+    const name = normalizeTextInput(nameInput);
+    const phone = phoneInput?.value || '';
+    const birthDate = birthDateInput?.value || '';
+    const gender = validateGenderValue(regForm);
+    if (emailInput) emailInput.value = email;
+
+    let ok = true;
+
+    if ((requireAll || email) && !validateEmail(email)) {
+      showFieldError(emailInput, 'Введите email (только разрешённые домены)');
+      ok = false;
+    }
+    if ((requireAll || password) && !validatePassword(password)) {
+      showFieldError(passwordInput, 'Пароль минимум 6 символов');
+      ok = false;
+    }
+    if ((requireAll || name) && !validateName(name)) {
+      showFieldError(nameInput, 'Имя: только буквы, пробел, дефис (от 2 символов)');
+      ok = false;
+    }
+    if (!validateCountryBinding({ show: requireAll })) ok = false;
+    if (!validateCityBinding({ show: requireAll })) ok = false;
+
+    const phoneCode = (phoneCodeInput?.value || '').trim();
+    if ((requireAll || phone.trim()) && !validatePhoneByCountryCode(phone, phoneCode)) {
+      showFieldError(
+        phoneInput,
+        phoneCode
+          ? `Телефон должен начинаться с ${phoneCode} и быть корректным`
+          : 'Введите корректный телефон (+ и 10–15 цифр)'
+      );
+      ok = false;
+    }
+    if ((requireAll || birthDate) && !validateBirthDate(birthDate)) {
+      showFieldError(birthDateInput, 'Возраст должен быть 14+ и дата корректная');
+      ok = false;
+    }
+    if (requireAll && !gender) {
+      const genderWrap = document.getElementById('gender-group');
+      if (genderWrap) genderWrap.classList.add('error');
+      showFieldError(genderInputs[0], 'Выберите пол');
+      ok = false;
+    }
+
+    return ok;
+  }
+
   regForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearFieldErrors(regForm);
 
-    const email = regForm.querySelector('[name="email"]')?.value || '';
-    const password = regForm.querySelector('[name="password"]')?.value || '';
-    const name = regForm.querySelector('[name="name"]')?.value || '';
-    const phone = regForm.querySelector('[name="phone"]')?.value || '';
-    const phoneNormalized = normalizePhoneAny(phone);
-    const birth_date = regForm.querySelector('[name="birth_date"]')?.value || '';
-    const gender = regForm.querySelector('input[name="gender"]:checked')?.value || '';
-    const country_id = document.getElementById('country-id')?.value || '';
-    const city_id = document.getElementById('city-id')?.value || '';
-    const phone_code = document.getElementById('phone-code')?.value || '';
-
-    let ok = true;
-
-    if (!validateEmail(email)) {
-      showFieldError(regForm.querySelector('[name="email"]'), 'Введите email (только разрешённые домены)');
-      ok = false;
+    const clientOk = runClientValidation({ requireAll: true });
+    if (!clientOk) {
+      scrollToFirstError(regForm);
+      return;
     }
-    if (!validatePassword(password)) {
-      showFieldError(regForm.querySelector('[name="password"]'), 'Пароль минимум 6 символов');
-      ok = false;
-    }
-    if (!validateName(name)) {
-      showFieldError(regForm.querySelector('[name="name"]'), 'Имя: только буквы, пробел, дефис (от 2 символов)');
-      ok = false;
-    }
-
-    // страна/город — ТОЛЬКО из подсказки
-    if (!country_id) {
-      showFieldError(document.getElementById('country-input'), 'Выберите страну из подсказки');
-      ok = false;
-    }
-    if (!city_id) {
-      showFieldError(document.getElementById('city-input'), 'Выберите город из подсказки');
-      ok = false;
-    }
-
-    // телефон — под выбранный код страны (если есть)
-    if (!validatePhoneByCountryCode(phone, phone_code)) {
-      showFieldError(regForm.querySelector('[name="phone"]'), phone_code
-        ? `Телефон должен начинаться с ${phone_code} и быть корректным`
-        : 'Введите корректный телефон (+ и 10–15 цифр)'
-      );
-      ok = false;
-    }
-    if (!validateBirthDate(birth_date)) {
-      showFieldError(regForm.querySelector('[name="birth_date"]'), 'Возраст должен быть 14+ и дата корректная');
-      ok = false;
-    }
-    if (!gender || !['male','female'].includes(gender)) {
-      showFieldError(document.getElementById('gender-input'), 'Выберите пол');
-      ok = false;
-    }
-
-    if (!ok) return;
 
     const payload = {
-      email,
-      password,
-      name,
-      phone: normalizePhoneAny(phone),     // важное: нормализуем
-      country_id,
-      city_id,
-      birth_date,
-      gender,
+       email: (emailInput?.value || '').trim().toLowerCase(),
+      password: passwordInput?.value || '',
+      name: (nameInput?.value || '').trim(),
+      phone: phoneInput?.value || '',
+      country_id: countryIdInput?.value || '',
+      city_id: cityIdInput?.value || '',
+      birth_date: birthDateInput?.value || '',
+      gender: validateGenderValue(regForm),
     };
+
+    const csrfToken = regForm.querySelector('input[name="csrfmiddlewaretoken"]')?.value || getCookie('csrftoken');
 
     try {
       const res = await fetch('/api/register/', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+         headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': csrfToken,
+        },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json().catch(() => ({}));
+      const expectsJson = parseAcceptsJson(res);
 
-      if (!res.ok) {
-        const errs = data.errors || {};
-        if (Object.keys(errs).length) {
-          Object.keys(errs).forEach((field) => {
-            // country/city у нас input не по name=country_id, поэтому обрабатываем вручную
-            if (field === 'country') return showFieldError(document.getElementById('country-input'), errs[field]);
-            if (field === 'city') return showFieldError(document.getElementById('city-input'), errs[field]);
-
-            const input = regForm.querySelector(`[name="${field}"]`);
-            showFieldError(input, errs[field]);
-          });
-        } else {
-          showFieldError(regForm.querySelector('[name="email"]'), data.message || 'Ошибка регистрации');
+      if (!res.ok || data.ok === false || data.success === false) {
+        showErrorsFromServer(data.errors);
+        if (!data.errors && data.message) {
+          showFieldError(emailInput, data.message);
         }
+        scrollToFirstError(regForm);
         return;
       }
 
-      window.location.href = '/index/';
+      const redirectUrl = data.redirect || '/profile/';
+      if (!expectsJson && !data.redirect) {
+        window.location.href = redirectUrl;
+        return;
+      }
+      window.location.href = redirectUrl;
     } catch (err) {
-      showFieldError(regForm.querySelector('[name="email"]'), 'Ошибка сети. Попробуйте ещё раз.');
+      showFieldError(emailInput, 'Ошибка сети. Попробуйте ещё раз.');
+      scrollToFirstError(regForm);
     }
   });
-}
+});
 
 document.addEventListener("DOMContentLoaded", () => {
   const input = document.getElementById("avatar-input");
