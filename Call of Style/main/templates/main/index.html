@@ -2,56 +2,34 @@
 
 {% load static %}
 
-{% block title %}Главная - Shop{% endblock %}
+{% block title %}Call of Style{% endblock %}
 
 {% block content %}
 <section class="hero" role="banner">
     <div class="hero-content">
         <h1>Найди свой стиль</h1>
-        <p>Маркетплейс, где твоя одежда находит тебя.</p>
-        <a href="#" class="btn">Перейти в каталог</a>
+        <a href="{% url 'catalog' %}" class="btn">Перейти в каталог</a>
     </div>
 </section>
 
-<main class="catalog" role="main">
+<section class="popular-screw">
+  <div class="popular-screw-header">
     <h2>Популярные товары</h2>
+  </div>
 
-    <section class="product-grid">
-        <article class="product-card">
-            <figure>
-                <img src="{% static 'main/img/jacket.jpg' %}" alt="Куртка">
-                <figcaption>Куртка</figcaption>
-            </figure>
-            <p class="price">4 500 ₽</p>
-            <button>Добавить в корзину</button>
-        </article>
+  <div class="screw-scroll" id="screwScroll">
+    <!-- Слой карточек (НЕ создаёт ширину) -->
+    <div class="screw-stage" id="screwStage">
+      {% for product in products %}
+        <div class="screw-item">
+          {% include "main/_product_card.html" with product=product %}
+        </div>
+      {% endfor %}
+    </div>
 
-        <article class="product-card">
-            <figure>
-                <img src="{% static 'main/img/hoodie.jpg' %}" alt="Толстовка">
-                <figcaption>Толстовка</figcaption>
-            </figure>
-            <p class="price">3 200 ₽</p>
-            <button>Добавить в корзину</button>
-        </article>
+    <!-- Фейковая ширина (создаёт скролл) -->
+    <div class="screw-spacer" id="screwSpacer"></div>
+  </div>
+</section>
 
-        <article class="product-card">
-            <figure>
-                <img src="{% static 'main/img/jeans.jpg' %}" alt="Джинсы">
-                <figcaption>Джинсы</figcaption>
-            </figure>
-            <p class="price">3 800 ₽</p>
-            <button>Добавить в корзину</button>
-        </article>
-
-        <article class="product-card">
-            <figure>
-                <img src="{% static 'main/img/vetrovka.jpg' %}" alt="Ветровка">
-                <figcaption>Ветровка</figcaption>
-            </figure>
-            <p class="price">3 800 ₽</p>
-            <button>Добавить в корзину</button>
-        </article>
-    </section>
-</main>
 {% endblock %}

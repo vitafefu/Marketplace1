@@ -64,6 +64,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'main.context_processors.favorites_context',
             ],
         },
     },
@@ -78,9 +79,9 @@ WSGI_APPLICATION = 'Call of Style.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'marketplace_db',
-        'USER': 'marketplace_user',
-        'PASSWORD': '12345',
+        'NAME': 'webcatalog_db',
+        'USER': 'postgres',
+        'PASSWORD': '@Bankprik010',
         'HOST': 'localhost',
         'PORT': '5432',
     }
@@ -104,6 +105,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'  # или любой другой путь на вашу главную страницу
 LOGOUT_REDIRECT_URL = '/'
 
@@ -113,7 +115,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'ru'
 
 TIME_ZONE = 'UTC'
 
@@ -125,7 +127,7 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
     BASE_DIR / "static",
@@ -136,3 +138,8 @@ STATICFILES_DIRS = [
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+AUTH_USER_MODEL = 'main.CustomUser'  # Указываем кастомную модель пользователя
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',  # стандартный бэкенд
+]

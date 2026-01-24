@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Каталог товаров - Call of Style{% endblock %}
+
+{% block content %}
+<div class="catalog-page">
+    <!-- Заголовок и сортировка -->
+    <div class="catalog-header">
+        <h1>Каталог товаров</h1>
+        <div class="catalog-controls">
+            <!-- Сортировка -->
+            <select name="sort" onchange="this.form.submit()" class="sort-select">
+                <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Сначала новые</option>
+                <option value="popular" {% if sort_by == 'popular' %}selected{% endif %}>Популярные</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="row g-4 catalog-grid">
+        <aside class="col-12 col-lg-3">
+        <!-- Боковая панель с фильтрами -->
+        <div class="catalog-filters">
+            <h3>Категории</h3>
+            <ul class="category-list">
+                <li>
+                    <a href="{% url 'catalog' %}" 
+                       class="{% if not current_category %}active{% endif %}">
+                        Все товары
+                    </a>
+                </li>
+                {% for category in categories %}
+                <li>
+                    <a href="{% url 'catalog' %}?category={{ category.id }}" 
+                       class="{% if current_category == category.id|stringformat:'i' %}active{% endif %}">
+                        {{ category.name }}
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
+        </aside>
+
+        <!-- Основной контент -->
+        <main class="catalog-content">
+          <div class="px-2 px-md-0">   {# или px-3, если хочешь больше воздуха #}
+            <div class="row gx-3 gy-3">
+              {% for product in page_obj %}
+                <div class="col-6 col-md-4 col-lg-3">
+                  {% include "main/_product_card.html" with product=product %}
+                </div>
+              {% empty %}
+                <div class="no-products">
+                  <p>Товары не найдены</p>
+                  <a href="{% url 'catalog' %}" class="btn-primary">Сбросить фильтры</a>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+        </main>
+
+    </div>
+</div>
+{% endblock %}

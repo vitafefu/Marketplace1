@@ -1,0 +1,36 @@
+{% load static %}
+
+<div class="card h-100 product-card">
+  {% if product.images.first %}
+    <img src="{{ product.images.first.image.url }}" class="card-img-top product-img" alt="{{ product.title }}">
+  {% else %}
+    <img src="{% static 'main/img/noimg.png' %}" class="card-img-top product-img" alt="Нет изображения">
+  {% endif %}
+
+  <div class="card-body d-flex flex-column product-info">
+    <h3 class="card-title product-title mb-2">{{ product.title }}</h3>
+
+    <p class="card-text product-brand mb-3">{{ product.brand|default:"—" }}</p>
+
+    <div class="mt-auto product-card-actions d-grid gap-2">
+      <a href="{% url 'product_detail' product.id %}" class="btn btn-dark btn-sm">
+        Подробнее
+      </a>
+
+      {% if user.is_authenticated %}
+        <form method="post" action="{% url 'toggle_favorite' product.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <button type="submit" class="btn btn-danger btn-sm w-100">
+            {% if product.id in favorite_ids %}💔 Убрать{% else %}❤ В избранное{% endif %}
+          </button>
+        </form>
+      {% else %}
+        <a class="btn btn-danger btn-sm"
+           href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">
+          ❤ В избранное
+        </a>
+      {% endif %}
+    </div>
+  </div>
+</div>

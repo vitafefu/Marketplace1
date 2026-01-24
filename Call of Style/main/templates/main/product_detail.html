@@ -1,0 +1,209 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ product.title }} - Call of Style{% endblock %}
+
+{% block content %}
+
+<section class="product-detail" style="max-width:1200px;margin:0 auto;padding:40px 20px;">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start;">
+
+        <!-- ================= ГАЛЕРЕЯ ================= -->
+        <div class="product-gallery">
+
+            {% if product.images.first %}
+                <div style="margin-bottom:20px;">
+                    <img id="main-image"
+                         src="{{ product.images.first.image.url }}"
+                         alt="{{ product.title }}"
+                         style="width:100%;border-radius:10px;box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+                </div>
+
+                {% if product.images.count > 1 %}
+                <div style="display:flex;gap:10px;overflow-x:auto;">
+                    {% for image in product.images.all %}
+                        <img src="{{ image.image.url }}"
+                             alt="{{ product.title }}"
+                             style="width:80px;height:80px;object-fit:cover;border-radius:5px;cursor:pointer;"
+                             onclick="document.getElementById('main-image').src=this.src">
+                    {% endfor %}
+                </div>
+                {% endif %}
+            {% else %}
+                <img src="{% static 'main/img/noimg.png' %}"
+                     alt="Нет изображения"
+                     style="width:100%;border-radius:10px;">
+            {% endif %}
+
+        </div>
+
+        <!-- ================= ИНФОРМАЦИЯ ================= -->
+        <div>
+            <h1>{{ product.title }}</h1>
+
+            {% if product.brand %}
+                <p style="color:#777;">Бренд: {{ product.brand }}</p>
+            {% endif %}
+
+            <p>{{ product.description }}</p>
+
+            {% if product.attributes %}
+                <h3>Характеристики</h3>
+                <div style="background:#f8f9fa;padding:15px;border-radius:8px;">
+                    {% for k,v in product.attributes.items %}
+                        <div style="display:flex;justify-content:space-between;">
+                            <b>{{ k }}</b><span>{{ v }}</span>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <div class="product-actions">
+                {% if user.is_authenticated %}
+                  <form method="post" action="{% url 'toggle_favorite' product.id %}">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.get_full_path }}">
+                    <button type="submit" class="btn-primary">
+                      {% if is_favorite %}💔 Убрать из избранного{% else %}❤ В избранное{% endif %}
+                    </button>
+                  </form>
+                {% else %}
+                  <a href="{% url 'login' %}?next={{ request.get_full_path }}">
+                    <button type="button" class="btn-primary">❤ В избранное</button>
+                  </a>
+                {% endif %}
+
+              {% if user.is_authenticated and is_owner_or_admin %}
+                <a href="{% url 'edit_product' product.id %}">
+                  <button type="button" class="btn-primary">✏️ Редактировать товар</button>
+                </a>
+              {% endif %}
+
+              <a href="{% url 'support_chat_product' 'support' product.id %}">
+                <button type="button" class="btn-primary">🛠️ Написать в поддержку</button>
+              </a>
+            </div>
+        </div>
+</section>
+
+<!-- ================= ОТЗЫВЫ ================= -->
+<section style="max-width:1000px;margin:60px auto 0;padding:20px;">
+    <h2>Отзывы</h2>
+
+    <!-- ===== Средний рейтинг ===== -->
+    <div style="margin:20px 0;padding:15px;background:#f8f9fa;border-radius:10px;">
+        <b style="font-size:1.6rem;color:#ff6b6b;">{{ avg_rating }}/5</b>
+        <div>
+            {% for i in "12345" %}
+                {% if forloop.counter <= avg_rating|floatformat:0 %}⭐{% else %}☆{% endif %}
+            {% endfor %}
+        </div>
+        <small>Отзывов: {{ reviews.count }}</small>
+    </div>
+
+    <!-- ===== Список отзывов ===== -->
+    {% for review in reviews %}
+        <div style="border:1px solid #eee;border-radius:10px;padding:20px;margin-bottom:20px;">
+            <b>{% if review.author.first_name %}{{ review.author.first_name }}{% else %}{{ review.author.email }}{% endif %}</b>
+            <div style="color:#ff6b6b;">
+                {% for i in "12345" %}
+                    {% if forloop.counter <= review.rating %}⭐{% else %}☆{% endif %}
+                {% endfor %}
+            </div>
+
+            <small>{{ review.created_at|date:"d.m.Y" }}</small>
+
+            {% if review.title %}
+                <h4>{{ review.title }}</h4>
+            {% endif %}
+
+            <p>{{ review.comment }}</p>
+
+            {% if user == review.author %}
+                <div style="display:flex;gap:10px;margin-top:10px;">
+                    <button class="btn-small" onclick="toggleEdit({{ review.id }})">✏️ Редактировать</button>
+                    <a href="{% url 'delete_review' review.id %}"
+                       class="btn-small"
+                       onclick="return confirm('Удалить отзыв?');">
+                        🗑 Удалить
+                    </a>
+                </div>
+
+                <!-- ===== Форма редактирования ===== -->
+                <form method="post"
+                      id="edit-form-{{ review.id }}"
+                      class="review-form"
+                      style="display:none;margin-top:15px;">
+                    {% csrf_token %}
+                    <input type="hidden" name="edit_review_id" value="{{ review.id }}">
+
+                    <div class="review-rating edit-rating">
+                      {% for i in "54321" %}
+                        {% with star=i|stringformat:"s" %}
+                          <input
+                            type="radio"
+                            id="edit-{{ review.id }}-star{{ star }}"
+                            name="rating"
+                            value="{{ star }}"
+                            {% if review.rating|stringformat:"s" == star %}checked{% endif %}
+                          >
+                          <label for="edit-{{ review.id }}-star{{ star }}">★</label>
+                        {% endwith %}
+                      {% endfor %}
+                    </div>
+
+                    <input type="text" name="title" value="{{ review.title }}">
+                    <textarea name="comment" rows="4">{{ review.comment }}</textarea>
+
+                    <button type="submit">💾 Сохранить</button>
+                </form>
+            {% endif %}
+        </div>
+    {% empty %}
+        <p style="text-align:center;color:#777;">Отзывов пока нет</p>
+    {% endfor %}
+
+    <!-- ===== Добавление отзыва ===== -->
+    {% if user.is_authenticated %}
+        {% if not has_review %}
+            <form method="post" class="review-form">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="create">
+
+                <h3>Оставить отзыв</h3>
+
+                <div class="review-rating">
+                    {% for i in "54321" %}
+                        <input type="radio"
+                               id="star{{ i }}"
+                               name="rating"
+                               value="{{ i }}"
+                               {% if form.initial.rating|stringformat:"s" == i %}checked{% endif %}>
+                        <label for="star{{ i }}">★</label>
+                    {% endfor %}
+                </div>
+
+
+                {{ form.title }}
+                {{ form.comment }}
+
+                <button type="submit">Отправить</button>
+            </form>
+        {% else %}
+            <p style="color:#777;">Вы уже оставили отзыв</p>
+        {% endif %}
+    {% else %}
+        <a href="{% url 'login' %}?next={{ request.path }}">Войдите, чтобы оставить отзыв</a>
+    {% endif %}
+</section>
+
+<script>
+function toggleEdit(id) {
+    const form = document.getElementById('edit-form-' + id);
+    if (form) {
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+}
+</script>
+
+{% endblock %}

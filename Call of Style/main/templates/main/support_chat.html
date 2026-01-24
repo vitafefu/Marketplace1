@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Чат поддержки - Call of Style{% endblock %}
+
+{% block content %}
+<div class="chat-page">
+    <div class="chat-header">
+        <h1>
+            {% if chat.chat_type == 'seller' %}
+                Чат с продавцом
+            {% elif chat.chat_type == 'consultant' %}
+                Чат с консультантом
+            {% else %}
+                Техподдержка
+            {% endif %}
+        </h1>
+        <div class="chat-info">
+            {% if chat.product %}
+            <p>Товар: <a href="{% url 'product_detail' chat.product.id %}">{{ chat.product.title }}</a></p>
+            {% endif %}
+            <p>Собеседник: {{ chat.seller.username }}</p>
+        </div>
+    </div>
+
+    <div class="chat-messages" id="chat-messages">
+        {% for message in messages %}
+        <div class="message {% if message.sender == user %}message-sent{% else %}message-received{% endif %}">
+            <div class="message-content">
+                <p>{{ message.text }}</p>
+                <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
+            </div>
+        </div>
+        {% empty %}
+        <div class="no-messages">
+            <p>Чат пуст. Начните общение!</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <form method="POST" class="chat-form">
+        {% csrf_token %}
+        <div class="message-input">
+            <input type="text" name="message" placeholder="Введите сообщение..." required>
+            <button type="submit">-></button>
+        </div>
+    </form>
+</div>
+{% endblock %}

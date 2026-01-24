@@ -4,6 +4,31 @@
     padding: 0; /* Убирает все внутренние отступы у всех элементов */
     box-sizing: border-box; /* Устанавливает модель расчета размеров для всех элементов */
 }
+/* Стили для домашней страницы */
+.hero-section {
+    padding: 100px 20px;
+    text-align: center;
+}
+
+.hero-title {
+    font-size: 2.7rem;
+    margin-bottom: 30px;
+    font-weight: bold;
+}
+
+.hero-subtitle {
+    font-size: 1.2rem;
+    color: #666;
+}
+/* ===================== Основной контейнер ===================== */
+.main-container {
+    flex: 1;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
 
 body {
     font-family: Arial, sans-serif; /* Устанавливает шрифт по умолчанию для всего тела страницы */
@@ -11,25 +36,122 @@ body {
     background-color: #f8f8f8; /* Фоновый цвет для всей страницы */
     color: #333; /* Цвет текста на странице */
 }
+/* ===================== Верхний информационный бар ===================== */
+.top-bar {
+    background-color: #333;
+    color: white;
+    padding: 8px 10px;
+    font-size: 0.85rem;
+    border-bottom: 1px solid #444;
+}
 
+.top-bar-content {
+    padding: 0 10px;
+    display: flex;
+    justify-content: flex-start;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    min-height: 17px;
+}
+
+.top-bar-left {
+    display: flex;
+    gap: 20px;
+    align-items: center;
+}
+
+.top-bar-right {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.top-bar-right a {
+    color: white;
+    text-decoration: none;
+    transition: color 0.3s;
+}
+
+.top-bar-right a:hover {
+    color: #ff6b6b;
+}
+.location {
+    position: static; /* Абсолютное позиционирование относительно родителя */
+    left: 10px; /* Выравнивание по левому краю */
+    font-size: 0.85rem;
+    padding: 0;
+    background: none;
+    border: none;
+    color: inherit;
+    text-decoration: underline;
+    cursor: pointer;
+    z-index: 200; /* Поверх других элементов */
+}
+.location-wrap { position: relative; }
+.location-display {
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.location-edit {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.location-edit input {
+  width: 160px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #666;
+  outline: none;
+}
+
+.location-edit input:focus {
+  border-color: #ff6b6b;
+}
+
+.location-edit .suggest-box {
+  width: 160px;
+  left: auto;
+  right: auto;
+}
+
+/* Адаптив для мобильных */
+@media (max-width: 768px) {
+    .top-bar {
+        padding: 6px 15px;
+        font-size: 0.75rem;
+    }
+
+    .top-bar-content {
+        flex-direction: column;
+        gap: 5px;
+    }
+
+    .top-bar-left {
+        gap: 10px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+}
 /* ===================== Шапка ===================== */
 .header {
     display: flex; /* Применяет CSS Grid Layout для шапки */
     grid-template-columns: auto 1fr auto; /* Создает три колонки: левая (auto), центральная (1fr) и правая (auto) */
     align-items: center; /* Выравнивание элементов по вертикали по центру */
-    gap: 15px; /* Задает промежуток между колонками */
-    padding: 20px 20px; /* Внутренние отступы вокруг содержимого шапки */
+    gap: 5px; /* Задает промежуток между колонками */
+    padding: 12px 12px; /* Внутренние отступы вокруг содержимого шапки */
     background-color: #fff; /* Фоновый цвет для шапки */
     border-bottom: 1px solid #ddd; /* Нижняя граница для шапки */
-    position: sticky; /* Закрепляет шапку при прокрутке страницы */
     top: 0; /* Устанавливает шапку на верхнюю границу экрана */
-    z-index: 100; /* Устанавливает z-index, чтобы шапка находилась поверх других элементов */
 }
 
 .header-left {
     display: flex; /* Применяет Flexbox для левой части шапки */
     align-items: center; /* Центрирует элементы по вертикали */
-    gap: 10px; /* Задает промежуток между элементами */
+    gap: 1px; /* Задает промежуток между элементами */
     flex-shrink: 0; /* Запрещаем сжимать */
 }
 
@@ -42,7 +164,7 @@ body {
 
 .logo-mini {
     font-weight: bold; /* Жирное начертание для логотипа */
-    font-size: clamp(1rem, 2vw, 1.5rem); /* Динамичный размер шрифта, который зависит от ширины экрана */
+    font-size: clamp(1rem, 2vw, 1rem); /* Динамичный размер шрифта, который зависит от ширины экрана */
 }
 
 .header-center {
@@ -50,7 +172,7 @@ body {
     justify-content: center; /* Центрируем элементы по горизонтали */
     width: 100%;
     flex-grow: 1; /* Форме поиска разрешается растягиваться */
-    margin: 0 10px; /* Отступы по бокам */
+    margin: 0 5px; /* Отступы по бокам */
     min-width: 0; /* Запрещаем сжимать форму ниже нужного размера */
     overflow: hidden; /* Убирает лишний контент, если не помещается */
 }
@@ -58,16 +180,16 @@ body {
 .search-form {
     display: flex; /* Flexbox для формы поиска */
     width: 100%; /* Форма занимает всю доступную ширину */
-    max-width: 800px; /* Максимальная ширина для формы поиска */
+    max-width: 640px; /* Максимальная ширина для формы поиска */
     min-width: 70px; /* Минимальная ширина для формы поиска */
     flex-grow: 1; /* Форма будет растягиваться, если есть место */
-    margin: 0 20px;
+    margin: 0 5px;
     flex-shrink: 1; /* Запрещаем сжимать */
 }
 
 .search-field {
     flex-grow: 1; /* Поле поиска будет занимать доступное пространство */
-    min-width: 70px; /* Минимальная ширина поля */
+    min-width: 90px; /* Минимальная ширина поля */
     padding: 5px 10px;
     border: 1px solid #ccc;
     border-radius: 15px 0 0 15px;
@@ -83,28 +205,12 @@ body {
     background-color: #333; /* Цвет фона кнопки */
     color: #fff; /* Цвет текста кнопки */
     cursor: pointer; /* Курсор в виде руки */
-    border-radius: 0 3px 3px 0; /* Закругленные углы на правой стороне кнопки */
+    border-radius: 0 15px 15px 0; /* Закругленные углы на правой стороне кнопки */
 }
-
-.location {
-    position: absolute; /* Абсолютное позиционирование относительно родителя */
-    top: 3px; /* Поднимаем кнопку выше */
-    left: 10px; /* Выравнивание по левому краю */
-    font-size: 12px;
-    padding: 0;
-    background: none;
-    border: none;
-    color: inherit;
-    text-decoration: underline;
-    cursor: pointer;
-    z-index: 200; /* Поверх других элементов */
-}
-
-
 
 .header-right {
     display: flex; /* Flexbox для правой части */
-    gap: 10px; /* Промежуток между элементами */
+    gap: 20px; /* Промежуток между элементами */
     align-items: center; /* Выравнивание элементов по вертикали */
     transition: all 0.3s; /* Плавная анимация для всех изменений */
 }
@@ -124,7 +230,7 @@ body {
     background-color: #555; /* Цвет фона кнопки при наведении */
 }
 
-.greeting {
+.user-greeting {
     display: inline-flex; /* Элемент будет располагаться на одной строке с остальными */
     align-items: center; /* Центрирование текста внутри */
     white-space: nowrap; /* Запрещает перенос строки внутри этого элемента */
@@ -149,8 +255,165 @@ body {
 .register-btn:hover {
     background-color: #555; /* Цвет фона кнопки при наведении */
 }
+/* ===== Аватар в шапке ===== */
+.header-avatar{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  overflow: hidden;
+  text-decoration: none;
+}
 
+.header-avatar-img{
+  width: 34px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 50%;
+  display: block;
+}
 
+.header-avatar-placeholder{
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+
+/* ===================== БОКОВАЯ ПАНЕЛЬ ===================== */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: -300px;
+    width: 280px;
+    height: 100vh;
+    background: white;
+    box-shadow: 2px 0 10px rgba(0,0,0,0.1);
+    transition: left 0.3s ease;
+    z-index: 1000;
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+.sidebar-header {
+    padding: 20px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #f8f9fa;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    font-size: 2rem;
+    cursor: pointer;
+    color: #333;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.sidebar-nav {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.sidebar-nav a {
+    padding: 12px 15px;
+    text-decoration: none;
+    color: #333;
+    border-radius: 5px;
+    transition: all 0.3s;
+    display: block;
+}
+
+.sidebar-nav a:hover {
+    background: #ff6b6b;
+    color: white;
+}
+
+.sidebar-logout {
+    width: 100%;
+    padding: 12px 15px;
+    background: none;
+    border: none;
+    color: #dc3545;
+    text-align: left;
+    cursor: pointer;
+    border-radius: 5px;
+    transition: all 0.3s;
+    font-family: inherit;
+    font-size: inherit;
+}
+
+.sidebar-logout:hover {
+    background: #dc3545;
+    color: white;
+}
+
+.overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    display: none;
+    z-index: 999;
+}
+
+.overlay.active {
+    display: block;
+}
+/* ===== Аватар в сайдбаре ===== */
+.sidebar-avatar{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  margin-right: 10px;
+}
+
+.sidebar-avatar-img{
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.sidebar-avatar-placeholder{
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #f0f0f0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size: 1.2rem;
+}
+/* Скрываем меню-кнопку на широких экранах */
+@media (min-width: 901px) {
+    .menu-btn {
+        display: none !important;
+    }
+}
+
+/* Показываем меню-кнопку когда нужно */
+@media (max-width: 900px) {
+    .menu-btn {
+        display: block !important;
+    }
+}
 /* Адаптация для мобильных: скрытие кнопок */
 @media (max-width: 1000px) {
     .header-right > .cart-btn { display: none; } /* Скрывает кнопку корзины */
@@ -168,14 +431,34 @@ body {
     .header-right { display: none; } /* Скрывает кнопку местоположения */
 
 }
+@media (min-width: 901px){
+  .sidebar-avatar{ display:none; }
+}
 
+/* На мобилке: прячем аватар в шапке, показываем в sidebar */
+@media (max-width: 900px){
+  .header-avatar{ display:none; }
+  .sidebar-avatar{ display:flex; }
+}
 /* ===================== Адаптация для мобильных ===================== */
 @media (max-width: 768px) {
-    .header {
-        grid-template-columns: 1fr; /* Шапка становится одноуровневой для мобильных */
-        padding: 10px;
+    .main-container {
+        max-width: 100%;
+        padding: 0 !important; /* Форсируем удаление отступов */
     }
 
+    .header {
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+        box-sizing: border-box;
+    }
+    .logo-img {
+        width: 125px !important;
+        max-height: 67px !important;
+    }
     .header-left {
         justify-content: space-between; /* Левая часть и меню по краям */
     }
@@ -238,63 +521,247 @@ body {
     background-color: #ff4c4c; /* Цвет фона кнопки при наведении */
 }
 
-/* ===================== Каталог ===================== */
+/* ===================== КАТАЛОГ ===================== */
+.catalog-page {
+    padding: 20px 0;
+}
+
+.catalog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+    flex-wrap: wrap;
+    gap: 20px;
+}
+
+.catalog-controls {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.catalog-search {
+    display: flex;
+}
+
+.catalog-search .search-input {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px 0 0 4px;
+}
+
+.catalog-search button {
+    padding: 8px 15px;
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 0 4px 4px 0;
+    cursor: pointer;
+}
+
+.sort-select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+.catalog-layout {
+    display: grid;
+    grid-template-columns: 250px 1fr;
+    gap: 30px;
+}
+
+/* Фильтры */
+.catalog-filters {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    height: fit-content;
+}
+
+.category-list {
+    list-style: none;
+    margin-top: 15px;
+}
+
+.category-list li {
+    margin-bottom: 8px;
+}
+
+.category-list a {
+    text-decoration: none;
+    color: #333;
+    padding: 8px 12px;
+    border-radius: 4px;
+    display: block;
+    transition: all 0.3s;
+}
+
+.category-list a:hover,
+.category-list a.active {
+    background: #ff6b6b;
+    color: white;
+}
+
+/* Адаптив для мобильных */
+@media (max-width: 768px) {
+    .catalog-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .catalog-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .catalog-controls {
+        flex-direction: column;
+    }
+}
+
+/* ===================== Популярные ===================== */
 .catalog {
     padding: 40px 20px; /* Внутренние отступы для каталога */
 }
 
-.product-grid {
-    display: grid; /* Grid layout для карточек товаров */
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); /* Автоматическая настройка количества колонок */
-    gap: 20px; /* Промежуток между элементами */
+.product-card{
+  width: 100%;
+  height: 100%;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: .2s;
 }
 
-.product-card {
-    background-color: #fff; /* Фон карточки товара */
-    border-radius: 5px; /* Закругленные углы */
-    padding: 15px; /* Внутренние отступы */
-    text-align: center; /* Выравнивание контента по центру */
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1); /* Тень вокруг карточки */
-    transition: transform 0.3s; /* Плавная анимация для эффекта hover */
+.product-card:hover{
+  transform: translateY(-3px);
+  box-shadow: 0 6px 18px rgba(0,0,0,.12);
 }
 
-.product-card:hover {
-    transform: translateY(-5px); /* Подъем карточки при наведении */
+.product-card img{
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  display: block;
 }
 
-.product-card img {
-    width: 100%; /* Ширина изображения в карточке */
-    border-radius: 5px; /* Закругленные углы изображения */
-    margin-bottom: 10px; /* Отступ снизу */
+.product-info{
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
 }
 
-.product-card .price {
-    font-weight: bold; /* Жирное начертание для цены */
-    margin: 10px 0; /* Отступы сверху и снизу */
+.product-title{
+  font-size: 1.4rem;
+  font-weight: 700;
+  line-height: 1.25;
+
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+
+  min-height: 1.2em;
+}
+.product-title, .product-brand{
+  word-break: normal;
+  overflow-wrap: normal;   /* НЕ режем слово по буквам */
+
 }
 
-.product-card button {
-    padding: 8px 12px; /* Внутренние отступы кнопки */
-    border: none; /* Без рамки */
-    background-color: #ff6b6b; /* Цвет фона кнопки */
-    color: #fff; /* Цвет текста кнопки */
-    border-radius: 3px; /* Закругленные углы кнопки */
-    cursor: pointer; /* Курсор в виде руки */
+
+.product-brand{
+  font-size: 1.1rem;
+  color: #777;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.product-card button:hover {
-    background-color: #ff4c4c; /* Цвет фона кнопки при наведении */
+.product-card-actions{
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ВАЖНО: убираем дефолтные отступы у form */
+.product-card-actions form {
+  margin: 0;
+}
+
+/* ОДИНАКОВЫЙ ВИД ДЛЯ <a> и <button> */
+.product-card-actions .btn-small,
+.product-card-actions .btn-small:link,
+.product-card-actions .btn-small:visited,
+.product-card-actions form .btn-small {
+  width: 100%;
+  display: block;           /* чтобы <a> стал как кнопка */
+  text-align: center;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-decoration: none;    /* убираем подчеркивание у <a> */
+  border: none;             /* убираем border у button */
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+/* Цвета кнопок */
+.product-card-actions .btn-details {
+  background: #333;
+  color: #fff;
+}
+.product-card-actions .btn-details:hover {
+  background: #555;
+}
+
+.product-card-actions .btn-fav {
+  background: #ff6b6b;
+  color: #fff;
+}
+.product-card-actions .btn-fav:hover {
+  background: #ff4c4c;
+}
+
+/* universal bootstrap columns for product cards */
+.row > [class*="col-"] { display: flex; }
+.row > [class*="col-"] .product-card{
+  flex: 1;
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 /* ===================== Футер ===================== */
+html, body {
+    height: 100%; /* Важно для sticky footer */
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh; /* Минимальная высота = весь экран */
+}
+
 .footer {
-    background-color: #222; /* Фоновый цвет футера */
-    color: #fff; /* Цвет текста футера */
-    text-align: center; /* Выравнивание текста по центру */
-    padding: 30px 20px; /* Внутренние отступы футера */
-    display: flex; /* Flexbox для футера */
-    flex-direction: column; /* Элементы располагаются по вертикали */
-    gap: 15px; /* Промежуток между элементами */
+    margin-top: auto; /* Прижимает футер к низу */
+    background-color: #222;
+    color: #fff;
+    text-align: center;
+    padding: 30px 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    /* Остальные твои стили остаются */
 }
 
 .footer nav a {
@@ -328,3 +795,800 @@ body {
     border-radius: 50%; /* Закругленные углы */
     margin: 0 5px; /* Промежуток между индикаторами */
 }
+/* ===================== Личный кабинет ===================== */
+.profile-layout {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 30px;
+    min-height: 600px;
+    margin-top: 20px;
+}
+
+/* Боковая панель */
+.profile-sidebar {
+    background: white;
+    border-radius: 10px;
+    padding: 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    height: fit-content;
+}
+
+.user-info {
+    text-align: center;
+    margin-bottom: 25px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.user-avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    margin-bottom: 15px;
+}
+
+.default-avatar-large {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    margin: 0 auto 15px;
+}
+
+.user-balance {
+    background: #ff6b6b;
+    color: white;
+    padding: 8px 15px;
+    border-radius: 20px;
+    font-weight: bold;
+    margin-top: 10px;
+    display: inline-block;
+}
+
+.profile-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.nav-item {
+    padding: 12px 15px;
+    text-decoration: none;
+    color: #333;
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.nav-item:hover,
+.nav-item.active {
+    background: #ff6b6b;
+    color: white;
+}
+
+/* Основной контент */
+.profile-content {
+    background: white;
+    border-radius: 10px;
+    padding: 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.content-section {
+    display: none;
+}
+
+.content-section.active {
+    display: block;
+}
+
+/* Карточки заказов */
+.order-card {
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.order-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.order-status {
+    padding: 4px 12px;
+    border-radius: 15px;
+    font-size: 0.8rem;
+    font-weight: bold;
+}
+
+.order-status.paid { background: #d4edda; color: #155724; }
+.order-status.pending { background: #fff3cd; color: #856404; }
+.order-status.shipped { background: #cce7ff; color: #004085; }
+
+.order-details {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 15px;
+    color: #666;
+}
+
+/* Адаптив для мобильных */
+@media (max-width: 768px) {
+    .profile-layout {
+        grid-template-columns: 1fr;
+        gap: 20px;
+    }
+
+    .profile-sidebar {
+        order: 1;
+    }
+
+    .profile-content {
+        order: 2;
+    }
+    /* Стиль для кнопки выхода в ЛК */
+    .logout-form {
+        margin-top: 15px;
+        border-top: 1px solid #eee;
+        padding-top: 15px;
+    }
+    .logout-btn {
+        width: 100%;
+        text-align: left;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #dc3545;
+        padding: 12px 15px;
+        border-radius: 8px;
+        transition: all 0.3s;
+        font-family: inherit;
+        font-size: inherit;
+        margin-top: 5px;
+    }
+
+    .logout-btn:hover {
+        background: #dc3545;
+        color: white;
+    }
+}
+/* ===================== ФОРМА ДОБАВЛЕНИЯ ТОВАРА ===================== */
+.add-product-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 30px 20px;
+}
+
+.product-form {
+    background: white;
+    padding: 30px;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.form-section {
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #eee;
+}
+
+.form-section h3 {
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.form-group textarea {
+    resize: vertical;
+    min-height: 100px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.btn-primary {
+    background: #ff6b6b;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    margin-right: 10px;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+}
+
+@media (max-width: 768px) {
+    .form-row {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ===================== МОИ ТОВАРЫ В ЛК ===================== */
+.products-actions {
+    margin-bottom: 20px;
+}
+
+.products-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.product-item {
+    display: flex;
+    gap: 15px;
+    padding: 15px;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    align-items: center;
+}
+
+.product-image {
+    flex-shrink: 0;
+    width: 60px;
+    height: 60px;
+}
+
+.product-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.no-image {
+    width: 100%;
+    height: 100%;
+    background: #f0f0f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    font-size: 1.5rem;
+}
+
+.product-info {
+    flex-grow: 1;
+}
+
+.product-info h4 {
+    margin: 0 0 5px 0;
+    color: #333;
+}
+
+.product-price {
+    font-weight: bold;
+    color: #ff6b6b;
+    margin: 0;
+}
+
+.product-status {
+    font-size: 0.8rem;
+    margin: 5px 0 0 0;
+}
+
+.product-status.active { color: #28a745; }
+.product-status.draft { color: #6c757d; }
+.product-status.inactive { color: #dc3545; }
+
+.product-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.btn-small {
+    padding: 6px 12px;
+    background: #333;
+    color: white;
+    text-decoration: none;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    transition: all 0.3s;
+}
+
+.btn-small:hover {
+    background: #555;
+    color: white;
+}
+/* ===== Избранное в ЛК: не даём карточкам стать "слишком узкими" ===== */
+.profile-fav-grid {
+  justify-content: flex-start;
+}
+
+.profile-fav-grid > [class*="col-"] {
+  min-width: 170px; /* ключевое — иначе текст начинает ломаться */
+}
+
+@media (max-width: 480px){
+  #favorites .product-title{ font-size: 1.05rem; }
+  #favorites .product-info{ padding: 10px; }
+  #favorites .product-card-actions .btn-small{ padding: 8px 10px; }
+}
+
+/* На очень узких экранах можно чуть снизить минимум */
+@media (max-width: 360px) {
+  .profile-fav-grid > [class*="col-"] {
+    min-width: 150px;
+  }
+}
+
+/* Адаптив для мобильных */
+@media (max-width: 768px) {
+    .product-item {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .product-actions {
+        justify-content: center;
+    }
+}
+
+/* ===================== ЧАТ ПОДДЕРЖКИ ===================== */
+.chat-page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.chat-header {
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+    margin-bottom: 20px;
+}
+
+.chat-messages {
+    height: 400px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 20px;
+    background: #f8f9fa;
+}
+
+.message {
+    margin-bottom: 15px;
+    display: flex;
+}
+
+.message-sent {
+    justify-content: flex-end;
+}
+
+.message-received {
+    justify-content: flex-start;
+}
+
+.message-content {
+    max-width: 70%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    position: relative;
+}
+
+.message-sent .message-content {
+    background: #007bff;
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.message-received .message-content {
+    background: white;
+    border: 1px solid #ddd;
+    border-bottom-left-radius: 4px;
+}
+
+.message-time {
+    font-size: 0.7rem;
+    opacity: 0.7;
+    display: block;
+    margin-top: 5px;
+}
+
+.chat-form {
+    display: flex;
+    gap: 10px;
+}
+
+.message-input {
+    display: flex;
+    flex-grow: 1;
+}
+
+.message-input input {
+    flex-grow: 1;
+    padding: 12px 15px;
+    border: 1px solid #ddd;
+    border-radius: 25px 0 0 25px;
+    outline: none;
+}
+
+.message-input button {
+    padding: 12px 20px;
+    background: #007bff;
+    color: white;
+    border: none;
+    border-radius: 0 25px 25px 0;
+    cursor: pointer;
+}
+
+.support-links {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 15px;
+}
+
+.support-links a {
+    color: white;
+    text-decoration: none;
+    padding: 8px 15px;
+    border: 1px solid white;
+    border-radius: 5px;
+    transition: all 0.3s;
+}
+
+.support-links a:hover {
+    background: white;
+    color: #333;
+}
+/* ===================== ФОРМА ОТЗЫВА ===================== */
+.review-form {
+    margin-top: 40px;
+    padding: 25px;
+    background: #ffffff;
+    border-radius: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+.review-form h3 {
+    margin-bottom: 20px;
+    color: #333;
+    font-size: 1.3rem;
+}
+
+/* Рейтинг (звёзды) */
+.review-rating {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.review-rating label {
+    cursor: pointer;
+    font-size: 1.8rem;
+    color: #ddd;
+    transition: color 0.3s;
+}
+
+.review-rating input {
+    display: none;
+}
+
+/* Подсветка выбранных звёзд */
+.review-rating input:checked ~ label,
+.review-rating label:hover,
+.review-rating label:hover ~ label {
+    color: #ff6b6b;
+}
+
+/* Поля формы */
+.review-form input[type="text"],
+.review-form textarea {
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    font-size: 1rem;
+    outline: none;
+    margin-bottom: 15px;
+    transition: border-color 0.3s, box-shadow 0.3s;
+}
+
+.review-form input[type="text"]:focus,
+.review-form textarea:focus {
+    border-color: #ff6b6b;
+    box-shadow: 0 0 0 2px rgba(255,107,107,0.2);
+}
+
+/* Кнопка */
+.review-form button {
+    background: #ff6b6b;
+    color: white;
+    padding: 12px 30px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    font-weight: bold;
+    transition: background-color 0.3s, transform 0.2s;
+}
+
+.review-form button:hover {
+    background: #ff4c4c;
+    transform: translateY(-1px);
+}
+
+/* Сообщение "уже оставили отзыв" */
+.review-info {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 6px;
+    color: #555;
+    font-size: 0.95rem;
+}
+
+/* Адаптив */
+@media (max-width: 768px) {
+    .review-form {
+        padding: 20px;
+    }
+
+    .review-rating label {
+        font-size: 1.5rem;
+    }
+}
+.gender-group {
+    display: flex;
+    gap: 20px;
+}
+
+.gender-btn {
+    display: flex;
+    align-items: center;   /* ВОТ ЭТО ГЛАВНОЕ */
+    gap: 8px;
+    cursor: pointer;
+    line-height: 1.2;
+    font-size: 1rem;
+}
+
+.gender-btn input[type="radio"] {
+    margin: 0;
+    transform: translateY(0); /* если вдруг браузер чудит */
+}
+
+.gender-btn span {
+    line-height: 1.2;
+}
+
+/* СТИЛИ ДЛЯ ОШИБОК ВАЛИДАЦИИ */
+.field-error {
+    color: #dc3545;
+    margin-top: 0.8vh;
+    display: block;
+}
+
+.auth-modal-content.desktop .field-error {
+    font-size: 0.8rem;
+}
+
+.auth-modal-content.tablet .field-error {
+    font-size: 0.75rem;
+}
+
+.auth-modal-content.mobile .field-error {
+    font-size: 0.7rem;
+}
+
+.auth-input-group input.error,
+.auth-input-group select.error,
+.phone-input.error {
+    border-color: #dc3545 !important;
+    background-color: rgba(220, 53, 69, 0.1) !important;
+}
+.suggest-box{
+  position:absolute;
+  left:0;
+  right:0;
+  top:100%;
+  color:#111 !important;
+  background:#fff !important;
+  border:1px solid #ddd;
+  border-radius:8px;
+  margin-top:6px;
+  max-height:220px;
+  overflow:auto;
+  z-index:2000;
+  box-shadow:0 8px 20px rgba(0,0,0,.08);
+}
+
+.suggest-item{
+  color:#111 !important;
+  background:transparent;
+  padding:10px 12px;
+  cursor:pointer;
+}
+
+.suggest-item:hover{
+  background:#f4f4f4;
+}
+
+/* ВСПЛЫВАЮЩИЕ ПОДСКАЗКИ С ОШИБКАМИ */
+.input-with-error {
+    position: relative;
+    overflow: visible;
+}
+
+.field-error-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    z-index: 10001;
+    margin-bottom: 8px;
+    width: 100%;
+    pointer-events: none;
+    animation: tooltipAppear 0.3s ease-out;
+}
+
+.field-error-tooltip-content {
+    background: #dc3545;
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid #c82333;
+    position: relative;
+    max-width: 100%;
+    text-align: center;
+}
+
+    .field-error-tooltip-content::after {
+        content: '';
+        position: absolute;
+        top: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        border: 5px solid transparent;
+        border-top-color: #dc3545;
+    }
+
+@keyframes tooltipAppear {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* АНИМАЦИЯ ШЕЙКА ДЛЯ ОШИБОК */
+@keyframes shake {
+    0%, 100% {
+        transform: translateX(0);
+    }
+
+    25% {
+        transform: translateX(-5px);
+    }
+
+    75% {
+        transform: translateX(5px);
+    }
+}
+
+.auth-input-group input.error,
+.auth-input-group select.error,
+.phone-input.error {
+    animation: shake 0.5s ease-in-out;
+}
+
+.product-actions {
+  margin-top: 29px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 320px;
+}
+
+.product-actions a {
+  text-decoration: none;
+}
+
+.product-actions .btn-primary {
+  width: 100%;
+}
+
+/* ===== POPULAR SCREW (HELIX) ===== */
+.screw-scroll{
+  position: relative;
+  height: 872px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background:#fff;
+  border-radius:12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+}
+
+/* важно: это реальная ширина/высота “окна” */
+.screw-viewport{
+  position: relative;
+  height: 872px;
+  width: 100%;
+}
+
+/* stage “приклеен” к окну, чтобы винт был всегда на месте */
+.screw-stage{
+  position: sticky;
+  top: 0;
+  left: 0;
+  height: 872px;
+  width: 100%;
+  perspective: 4200px;           /* камера */
+  transform-style: preserve-3d;
+}
+.screw-item .product-card{
+  width: 230px;
+  height: auto;
+}
+
+/* карточки поверх */
+.screw-item{
+  position:absolute;
+  left: 50%;
+  top: 50%;
+  transform-style: preserve-3d;
+  will-change: transform, opacity;
+  pointer-events: auto;
+}
+
+/* spacer делает “длину” горизонтального скролла */
+.screw-spacer{
+  height: 1px;
+  width: 950px; /* JS перезапишет */
+}
+

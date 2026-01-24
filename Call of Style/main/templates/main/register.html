@@ -1,33 +1,91 @@
 {% extends 'base.html' %}
 
-{% block title %}Регистрация - Shop{% endblock %}
+{% block title %}Регистрация{% endblock %}
 
 {% block content %}
-<section class="register" role="form" style="padding: 50px 20px; max-width: 500px; margin: 0 auto;">
-    <h2 style="text-align:center; margin-bottom: 30px;">Регистрация</h2>
 
-    <form action="" method="POST" style="display:flex; flex-direction:column; gap:15px;">
+<section class="register" style="max-width: 500px; margin: 40px auto;">
+    <h2 style="text-align:center; margin-bottom: 25px;">Регистрация</h2>
+
+    {# ВАЖНО: id="register-form" — твой JS его ищет #}
+    <form id="register-form" class="product-form" novalidate>
         {% csrf_token %}
-        <label for="username">Имя пользователя</label>
-        <input type="text" id="username" name="username" placeholder="Введите имя пользователя" required
-               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+        <div class="form-group auth-input-group">
+            <label>Имя *</label>
+            <div class="input-with-error">
+                <input type="text" name="name" placeholder="Введите имя" required>
+            </div>
+        </div>
 
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="Введите email" required
-               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+        <div class="form-group auth-input-group">
+            <label>Email *</label>
+            <div class="input-with-error">
+                <input type="email" name="email" placeholder="example@gmail.com" required>
+            </div>
+        </div>
+        <div class="form-group auth-input-group">
+            <label>Страна *</label>
+            <div class="input-with-error" style="position:relative;">
+                <input type="text" name="country" id="country-input" placeholder="Россия" autocomplete="off" required>
+                <!-- контейнер подсказок -->
+                <div id="country-suggest" class="suggest-box" style="display:none;"></div>
+              </div>
+        </div>
+        <div class="form-group auth-input-group">
+            <label>Город *</label>
+                <div class="input-with-error" style="position:relative;">
+                    <input type="text" name="city" id="city-input" placeholder="Москва" autocomplete="off" required>
+                    <div id="city-suggest" class="suggest-box" style="display:none;"></div>
+                </div>
+        </div>
+        <div class="form-group auth-input-group">
+          <label>Телефон *</label>
+          <div class="input-with-error">
+            <input type="text" name="phone" id="phone-input" class="phone-input" placeholder="+7..." required>
+          </div>
+        </div>
+        <input type="hidden" id="country-id" value="">
+        <input type="hidden" id="city-id" value="">
+        <input type="hidden" id="phone-code" value="">
+        <div class="form-group auth-input-group">
+            <label>Дата рождения *</label>
+            <div class="input-with-error">
+                <input type="date" name="birth_date" required>
+            </div>
+        </div>
+        <div class="form-group auth-input-group">
+            <label>Пол *</label>
+            <div class="input-with-error">
+                <div class="gender-group" id="gender-group">
+                    <label class="gender-btn">
+                        <input type="radio" name="gender" value="male" required>
+                            <span>Мужчина</span>
+                    </label>
 
-        <label for="password">Пароль</label>
-        <input type="password" id="password" name="password" placeholder="Введите пароль" required
-               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+                    <label class="gender-btn">
+                        <input type="radio" name="gender" value="female" required>
+                            <span>Женщина</span>
+                    </label>
+                </div>
+            </div>
+        </div>
 
-        <button type="submit" style="padding:12px; background-color:#ff6b6b; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; transition: background-color 0.3s;">
+        <div class="form-group auth-input-group">
+            <label>Пароль *</label>
+            <div class="input-with-error">
+                <input type="password" name="password" placeholder="Минимум 6 символов" required>
+            </div>
+        </div>
+
+        <button type="submit" class="btn-primary" style="width:100%;">
             Зарегистрироваться
         </button>
     </form>
 
-    <p style="margin-top:20px; text-align:center;">
+    <p style="text-align:center; margin-top:15px;">
         Уже есть аккаунт?
-        <a href="{% url 'login' %}" style="color:#ff6b6b; text-decoration:none;">Войти</a>
+        <a href="{% url 'login' %}">Войти</a>
     </p>
 </section>
+
 {% endblock %}

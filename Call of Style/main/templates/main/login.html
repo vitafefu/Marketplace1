@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Вход - Shop{% endblock %}
+{% block title %}Вход{% endblock %}
 
 {% block content %}
 <section class="login" role="form" style="padding: 50px 20px; max-width: 500px; margin: 0 auto;">
@@ -8,8 +8,9 @@
 
     <form action="" method="POST" style="display:flex; flex-direction:column; gap:15px;">
         {% csrf_token %}
-        <label for="username">Имя пользователя</label>
-        <input type="text" id="username" name="username" placeholder="Введите имя пользователя" required
+
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="Введите email" required
                style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
 
         <label for="password">Пароль</label>
