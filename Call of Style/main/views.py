@@ -13,6 +13,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
+from django.utils.http import url_has_allowed_host_and_scheme
 import urllib.parse
 import urllib.request
 from django.db import transaction
@@ -326,27 +327,9 @@ def index(request):
 
 
 def login_view(request):
-    """
-    CustomUser без username -> логин по email.
-    """
-    if request.method == 'POST':
-        email = (request.POST.get('email') or '').strip().lower()
-        password = request.POST.get('password') or ''
-
-        if not email or not password:
-            messages.error(request, 'Заполните все поля')
-            return render(request, 'login.html')
-
-        user = authenticate(request, email=email, password=password)
-        if user:
-            login(request, user)
-            next_url = request.POST.get('next') or request.GET.get('next') or 'index'
-            return redirect(next_url)
-
-        messages.error(request, 'Неверные данные')
-
+    if request.user.is_authenticated:
+        return redirect('index')
     return render(request, 'login.html')
-
 
 def register_view(request):
     """
@@ -683,6 +666,64 @@ def cities_suggest(request):
         "results": [{"id": c.id, "name": c.name} for c in qs]
     })
 
+@require_POST
+def api_login(request):
+    wants_json = (
+        request.headers.get('x-requested-with') == 'XMLHttpRequest'
+        or 'application/json' in (request.headers.get('Accept') or '')
+    )
+
+    def respond(payload, status=200):
+        if wants_json:
+            return JsonResponse(payload, status=status)
+        messages.error(request, payload.get('message') or 'Ошибка входа')
+        return redirect('login')
+
+    try:
+        data = json.loads(request.body.decode('utf-8') or '{}') if (
+            request.content_type and 'application/json' in request.content_type
+        ) else request.POST
+    except Exception:
+        return respond({'ok': False, 'errors': {'__all__': ['Некорректный JSON']}}, status=400)
+
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+    next_url = (data.get('next') or '').strip()
+
+    errors = {}
+    def add_error(field, msg): errors.setdefault(field, []).append(msg)
+
+    if not email: add_error('email', 'Введите email')
+    if not password: add_error('password', 'Введите пароль')
+
+    email_pattern = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+    if email and (not email_pattern.match(email) or ' ' in email):
+        add_error('email', 'Введите корректный email')
+    if password and (' ' in password):
+        add_error('password', 'Пароль не должен содержать пробелы')
+    if password and len(password) < 6:
+        add_error('password', 'Пароль минимум 6 символов')
+
+    if errors:
+        return respond({'ok': False, 'errors': errors}, status=400)
+
+    user = authenticate(request, email=email, password=password)
+    if not user:
+        return respond({'ok': False, 'errors': {'__all__': ['Неверный email или пароль']}}, status=400)
+
+    login(request, user)
+
+    from django.conf import settings
+    redirect_url = '/index/'
+    if next_url and url_has_allowed_host_and_scheme(
+        url=next_url,
+        allowed_hosts={request.get_host(), *getattr(settings, "ALLOWED_HOSTS", [])},
+        require_https=request.is_secure(),
+    ):
+        redirect_url = next_url
+
+    return respond({'ok': True, 'redirect': redirect_url})
+
 # =========================
 # API: register
 # =========================
@@ -720,7 +761,7 @@ class RegisterView(View):
             'gmail.com', 'outlook.com', 'hotmail.com', 'yahoo.com',
             'icloud.com', 'me.com', 'mac.com', 'proton.me', 'protonmail.com',
             'aol.com', 'yandex.ru', 'ya.ru', 'mail.ru', 'list.ru',
-            'bk.ru', 'inbox.ru', 'rambler.ru',
+            'bk.ru', 'inbox.ru', 'rambler.ru','dvfu.ru',
         }
 
         errors: dict[str, list[str]] = {}
@@ -844,7 +885,7 @@ class RegisterView(View):
 
         return respond({
             'ok': True,
-            'redirect': '/profile/',
+            'redirect': '/index/',
             'user': {
                 'id': user.id,
                 'email': user.email,

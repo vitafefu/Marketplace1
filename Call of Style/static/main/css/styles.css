@@ -1592,3 +1592,18 @@ body {
   width: 950px; /* JS перезапишет */
 }
 
+/* ===== LOGIN/REGISTER: нормальная ширина полей ===== */
+.login form{
+  width: 100%;
+}
+
+.login .input-with-error{
+  width: 100%;
+  display: block;
+}
+
+.login .input-with-error > input{
+  width: 100% !important;
+  display: block;
+  box-sizing: border-box;
+}

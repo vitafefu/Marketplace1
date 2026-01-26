@@ -1,3 +1,4 @@
+console.log('[script.js] LOADED', location.pathname);
 document.addEventListener("DOMContentLoaded", () => {
   // =================== LOCATION BAR (TOP BAR) ===================
   const locWrap = document.getElementById("location-wrap");
@@ -235,6 +236,8 @@ function clearFieldErrors(form) {
 function clearFieldError(inputEl, { keepTouched = true } = {}) {
   if (!inputEl) return;
 
+  inputEl.dataset.lockError = '0';
+
   const timerId = fieldErrorTimers.get(inputEl);
   if (timerId) {
     clearTimeout(timerId);
@@ -279,8 +282,9 @@ function showFieldError(inputEl, message, { autoHide = true } = {}) {
   inputEl.classList.add('error');
   inputEl.dataset.hasError = '1';
 
+  // ✅ если ошибка из submit — не даём ей исчезать от programmatic focus
+  if (!autoHide) inputEl.dataset.lockError = '1';
 
-  // обертка для tooltip
   const wrap = inputEl.closest('.input-with-error');
   const host = wrap || inputEl.parentElement;
   if (!host) return;
@@ -291,23 +295,19 @@ function showFieldError(inputEl, message, { autoHide = true } = {}) {
   const inputKey = inputEl.id || inputEl.name || '';
   tooltip.dataset.forInput = inputKey;
 
-  if (wrap) {
-    wrap.appendChild(tooltip);
-  } else {
-    inputEl.insertAdjacentElement('afterend', tooltip);
-  }
+  if (wrap) wrap.appendChild(tooltip);
+  else inputEl.insertAdjacentElement('afterend', tooltip);
 
   fieldErrorNodes.set(inputEl, tooltip);
+
   if (!autoHide) return;
 
-  const timerId = setTimeout(() => {
-    clearFieldError(inputEl);
-  }, FIELD_ERROR_HIDE_MS);
-
+  const timerId = setTimeout(() => clearFieldError(inputEl), FIELD_ERROR_HIDE_MS);
   fieldErrorTimers.set(inputEl, timerId);
 }
 
-function debounce(fn, wait = 250) {
+
+function debounce(fn, wait = 350) {
   let timeoutId = null;
   return (...args) => {
     clearTimeout(timeoutId);
@@ -343,26 +343,25 @@ function preventLeadingSpace(inputEl, message = 'Не начинайте с пр
   });
 }
 
-function attachLiveValidation(inputEl, validator, { debounceMs = 180 } = {}) {
+function attachBlurOnlyValidation(inputEl, validator) {
   if (!inputEl || typeof validator !== 'function') return;
 
-  const runValidationDebounced = debounce(() => {
-    validator(inputEl.value, { fromBlur: false, fromInput: true });
-  }, debounceMs);
-
-  inputEl.addEventListener('focus', () => clearFieldError(inputEl));
-
-  inputEl.addEventListener('blur', () => {
-    inputEl.dataset.touched = '1';
-    validator(inputEl.value, { fromBlur: true, fromInput: false });
+  inputEl.addEventListener('focus', () => {
+    // ✅ не чистим submit-ошибку от программного focus()
+    if (inputEl.dataset.lockError === '1') return;
+    clearFieldError(inputEl);
   });
 
   inputEl.addEventListener('input', () => {
+    // ✅ как только пользователь реально вводит — снимаем лок и чистим
+    if (inputEl.dataset.lockError === '1') inputEl.dataset.lockError = '0';
     if (inputEl.dataset.hasError === '1') clearFieldError(inputEl);
-
-    if (inputEl.dataset.touched === '1') runValidationDebounced();
   });
 
+  inputEl.addEventListener('blur', () => {
+    inputEl.dataset.touched = '1';
+    validator(inputEl.value, { fromBlur: true, fromSubmit: false });
+  });
 }
 
 
@@ -371,9 +370,6 @@ function scrollToFirstError(form) {
   const firstError = form.querySelector('.error');
   if (!firstError) return;
   firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  if (typeof firstError.focus === 'function') {
-    firstError.focus({ preventScroll: true });
-  }
 }
 
 function getCookie(name) {
@@ -891,11 +887,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ============ field validators (live) ============
   const validators = new Map([
-    [nameInput, () => {
+    [nameInput, (_, ctx = {}) => {
       const value = normalizeTextInput(nameInput);
-      if (!value) return true;
 
-      // длина сразу по вводу
+      if (!value) {
+        if (ctx.fromSubmit) {
+          showFieldError(nameInput, 'Введите имя');
+          return false;
+        }
+        return true;
+      }
+
       if (value.length > 30) {
         showFieldError(nameInput, 'Имя слишком длинное (до 30 символов)');
         return false;
@@ -905,111 +907,129 @@ document.addEventListener('DOMContentLoaded', () => {
         showFieldError(nameInput, 'Имя: только буквы, пробел, дефис (от 2 символов)');
         return false;
       }
+
       clearFieldError(nameInput);
       return true;
     }],
 
-    [emailInput, () => {
-      const value = (emailInput?.value || '').toLowerCase();
-      if (emailInput) emailInput.value = value;
+    [emailInput, (_, ctx = {}) => {
+      const value = (emailInput.value || '').toLowerCase();
+      emailInput.value = value;
 
-      if (!value) return true;
+      if (!value) {
+        if (ctx.fromSubmit) {
+          showFieldError(emailInput, 'Введите email');
+          return false;
+        }
+        return true;
+      }
 
       if (hasSpaces(value)) {
         showFieldError(emailInput, emailSpaceMessage);
         return false;
       }
 
-      if (value.length > 254) {
-        showFieldError(emailInput, 'Email слишком длинный');
+      if (!validateEmail(value)) {
+        showFieldError(emailInput, 'Введите корректный email');
         return false;
       }
 
-      if (!validateEmail(value)) {
-        showFieldError(emailInput, 'Введите email (только разрешённые домены)');
-        return false;
-      }
       clearFieldError(emailInput);
       return true;
     }],
 
-    [phoneInput, (value, meta = {}) => {
+    [phoneInput, () => {
       const phoneCode = (phoneCodeInput?.value || '').trim();
-      const raw = (value || '').trim();
-
-      // если пусто — ок
-      if (!raw) {
-        clearFieldError(phoneInput);
-        return true;
+      const value = phoneInput?.value || '';
+      if (!value.trim()) {
+        showFieldError(phoneInput, 'Введите номер телефона');
+        return false;
       }
 
-      // если там только префикс (маска) — НЕ ошибка во время ввода
-      // примеры: "+7", "+7 (", "+40"
-      const justPrefix =
-        phoneCode && (raw === phoneCode || raw === phoneCode + ' (' || raw === phoneCode + '(');
 
-      if (justPrefix) {
-        // показывать ошибку только если ушли с поля
-        if (meta.fromBlur) {
-          showFieldError(phoneInput, 'Введите номер полностью');
-          return false;
-        }
-        clearFieldError(phoneInput);
-        return true;
-      }
-
-      // ещё правило: пока цифр мало — не ругаемся, если это не blur/submit
-      const digits = getDigits(raw);
-      const minDigits = 11; // ты у себя используешь 11..15
-      if (!meta.fromBlur && digits.length < minDigits) {
-        clearFieldError(phoneInput);
-        return true;
-      }
-
-      // строгая проверка (на blur)
-      if (!validatePhoneByCountryCode(raw, phoneCode)) {
+      if (!validatePhoneByCountryCode(value, phoneCode)) {
         showFieldError(
           phoneInput,
-          phoneCode ? `Телефон должен начинаться с ${phoneCode} и быть корректным`
-                    : 'Введите корректный телефон (+ и 11–15 цифр)'
+          phoneCode
+            ? `Телефон должен начинаться с ${phoneCode} и быть корректным`
+            : 'Введите корректный телефон (+ и 11–15 цифр)'
         );
         return false;
       }
-
       clearFieldError(phoneInput);
       return true;
-}],
+    }],
 
+    [birthDateInput, (_, ctx = {}) => {
+      const raw = (birthDateInput?.value || '').trim();
 
-    [birthDateInput, () => {
-      const value = birthDateInput?.value || '';
-      if (!value) return true;
-      if (!validateBirthDate(value)) {
-        showFieldError(birthDateInput, 'Возраст должен быть 14+ и дата корректная');
+      // ОБЯЗАТЕЛЬНО при submit
+      if (!raw) {
+        if (ctx.fromSubmit) {
+          showFieldError(birthDateInput, 'Введите дату рождения');
+          return false;
+        }
+        return true;
+      }
+
+      // input[type=date] должен отдавать YYYY-MM-DD
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+        showFieldError(birthDateInput, 'Введите дату через календарь', { autoHide: !ctx.fromSubmit });
         return false;
       }
+
+      const year = Number(raw.slice(0, 4));
+      if (!Number.isFinite(year) || raw.slice(0, 4).length !== 4) {
+        showFieldError(birthDateInput, 'Год должен быть из 4 цифр', { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+
+      // ограничение по диапазону + возраст 14+
+      const d = new Date(raw + 'T00:00:00');
+      if (Number.isNaN(d.getTime())) {
+        showFieldError(birthDateInput, 'Некорректная дата', { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+
+      const today = new Date();
+      const min = new Date(1900, 0, 1);
+      const max = new Date(today.getFullYear() - 14, today.getMonth(), today.getDate());
+
+      if (d < min) {
+        showFieldError(birthDateInput, 'Дата слишком ранняя', { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+      if (d > max) {
+        showFieldError(birthDateInput, 'Возраст должен быть 14+', { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+
       clearFieldError(birthDateInput);
       return true;
     }],
 
-    [passwordInput, () => {
-      const value = passwordInput?.value || '';
-      if (!value) return true;
+
+    [passwordInput, (_, ctx = {}) => {
+      const value = passwordInput.value || '';
+
+      if (!value) {
+        if (ctx.fromSubmit) {
+          showFieldError(passwordInput, 'Введите пароль');
+          return false;
+        }
+        return true;
+      }
 
       if (hasSpaces(value)) {
         showFieldError(passwordInput, passwordSpaceMessage);
         return false;
       }
 
-      if (value.length > 128) {
-        showFieldError(passwordInput, 'Пароль слишком длинный (до 128 символов)');
+      if (value.length < 6) {
+        showFieldError(passwordInput, 'Пароль минимум 6 символов');
         return false;
       }
 
-      if (!validatePassword(value)) {
-        showFieldError(passwordInput, 'Пароль минимум 6 символов и без пробелов');
-        return false;
-      }
       clearFieldError(passwordInput);
       return true;
     }],
@@ -1026,7 +1046,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   validators.forEach((validator, inputEl) => {
-    attachLiveValidation(inputEl, validator);
+    attachBlurOnlyValidation(inputEl, validator);
     makeLiveNow(inputEl);
   });
 
@@ -1130,46 +1150,25 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   // ============ submit ============
-  async function runClientValidation({ requireAll = false } = {}) {
-    const email = (emailInput?.value || '').toLowerCase();
-    if (emailInput) emailInput.value = email;
+  async function validateAllOnSubmit(validators) {
+  let ok = true;
 
-    const password = passwordInput?.value || '';
-    const name = normalizeTextInput(nameInput);
-    const phone = phoneInput?.value || '';
-    const birthDate = birthDateInput?.value || '';
-    const gender = validateGenderValue(regForm);
+  for (const [inputEl, validator] of validators.entries()) {
+    if (!inputEl) continue;
 
-    let ok = true;
+    inputEl.dataset.touched = '1';
 
-    // поля обязательные — проверяем всегда в requireAll
-    if ((requireAll || name) && !validators.get(nameInput)()) ok = false;
-    if ((requireAll || email) && !validators.get(emailInput)()) ok = false;
-    if ((requireAll || password) && !validators.get(passwordInput)()) ok = false;
+    const res = await validator(inputEl.value, {
+      fromSubmit: true,
+      fromBlur: false,
+      fromInput: false,
+    });
 
-    if (!await validateCountryBinding({ show: requireAll })) ok = false;
-    if (!await validateCityBinding({ show: requireAll })) ok = false;
-
-    const phoneCode = (phoneCodeInput?.value || '').trim();
-    if ((requireAll || phone.trim()) && !validatePhoneByCountryCode(phone, phoneCode)) {
-      validators.get(phoneInput)();
-      ok = false;
-    }
-
-    if ((requireAll || birthDate) && !validateBirthDate(birthDate)) {
-      validators.get(birthDateInput)();
-      ok = false;
-    }
-
-    if (requireAll && !gender) {
-      const genderWrap = document.getElementById('gender-group');
-      if (genderWrap) genderWrap.classList.add('error');
-      showFieldError(genderInputs[0], 'Выберите пол', { autoHide: true });
-      ok = false;
-    }
-
-    return ok;
+    if (!res) ok = false;
   }
+
+  return ok;
+}
 
   function showErrorsFromServer(errors) {
     if (!errors) return;
@@ -1211,11 +1210,27 @@ document.addEventListener('DOMContentLoaded', () => {
     e.preventDefault();
     clearFieldErrors(regForm);
 
-    const clientOk = await runClientValidation({ requireAll: true });
-    if (!clientOk) {
+    let ok = true;
+
+    const clientOk = await validateAllOnSubmit(validators);
+    if (!clientOk) ok = false;
+
+    if (!await validateCountryBinding({ show: true })) ok = false;
+    if (!await validateCityBinding({ show: true })) ok = false;
+
+    const gender = validateGenderValue(regForm);
+    if (!gender) {
+      const genderWrap = document.getElementById('gender-group');
+      if (genderWrap) genderWrap.classList.add('error');
+      showFieldError(genderInputs[0], 'Выберите пол');
+      ok = false;
+    }
+
+    if (!ok) {
       scrollToFirstError(regForm);
       return;
     }
+
 
     const payload = {
       email: (emailInput?.value || '').trim().toLowerCase(),
@@ -1252,10 +1267,170 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      window.location.href = data.redirect || '/profile/';
+      window.location.href = data.redirect || '/index/';
     } catch (err) {
       showFieldError(emailInput, 'Ошибка сети. Попробуйте ещё раз.');
       scrollToFirstError(regForm);
+    }
+  });
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('login-form');
+  console.log('[LOGIN] form=', !!form);
+  if (!form) return;
+
+  const emailInput = form.querySelector('input[name="email"]');
+  const passInput  = form.querySelector('input[name="password"]');
+  const nextInput  = form.querySelector('input[name="next"]');
+
+  const emailSpaceMessage = 'Email не должен содержать пробелы';
+  const passwordSpaceMessage = 'Пароль не должен содержать пробелы';
+
+  const hasSpaces = (v) => /\s/.test(v || '');
+  const validateEmail = (email) => {
+    if (/\s/.test(email)) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  };
+
+  // блок пробела (как у тебя)
+  const attachSpaceBlocker = (inputEl, message) => {
+    if (!inputEl) return;
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key !== ' ') return;
+      e.preventDefault();
+      showFieldError(inputEl, message, { autoHide: true });
+    });
+  };
+  attachSpaceBlocker(emailInput, emailSpaceMessage);
+  attachSpaceBlocker(passInput, passwordSpaceMessage);
+
+  const validators = new Map([
+    [emailInput, (_, ctx = {}) => {
+      const value = (emailInput.value || '').trim().toLowerCase();
+      emailInput.value = value;
+
+      if (!value) {
+        if (ctx.fromSubmit) {
+          showFieldError(emailInput, 'Введите email', { autoHide: false });
+          return false;
+        }
+        return true;
+      }
+      if (hasSpaces(value)) {
+        showFieldError(emailInput, emailSpaceMessage, { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+      if (!validateEmail(value)) {
+        showFieldError(emailInput, 'Введите корректный email', { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+
+      clearFieldError(emailInput);
+      return true;
+    }],
+
+    [passInput, (_, ctx = {}) => {
+      const value = passInput.value || '';
+
+      if (!value) {
+        if (ctx.fromSubmit) {
+          showFieldError(passInput, 'Введите пароль', { autoHide: false });
+          return false;
+        }
+        return true;
+      }
+      if (hasSpaces(value)) {
+        showFieldError(passInput, passwordSpaceMessage, { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+      if (value.length < 6) {
+        // если хочешь такую же политику, как при регистрации
+        showFieldError(passInput, 'Пароль минимум 6 символов', { autoHide: !ctx.fromSubmit });
+        return false;
+      }
+
+      clearFieldError(passInput);
+      return true;
+    }],
+  ]);
+
+  validators.forEach((validator, inputEl) => attachBlurOnlyValidation(inputEl, validator));
+
+  async function validateAllOnSubmit(map) {
+    let ok = true;
+    for (const [inputEl, validator] of map.entries()) {
+      if (!inputEl) continue;
+      inputEl.dataset.touched = '1';
+      const res = await validator(inputEl.value, { fromSubmit: true, fromBlur: false, fromInput: false });
+      if (!res) ok = false;
+    }
+    return ok;
+  }
+
+  function showErrorsFromServer(errors) {
+    if (!errors) return;
+    Object.entries(errors).forEach(([field, messages]) => {
+      const msg = Array.isArray(messages) ? messages[0] : messages;
+      if (!msg) return;
+
+      if (field === '__all__') {
+        showFieldError(emailInput, msg, { autoHide: false });
+        return;
+      }
+      const target =
+        field === 'email' ? emailInput :
+        field === 'password' ? passInput :
+        form.querySelector(`[name="${field}"]`);
+
+      showFieldError(target, msg, { autoHide: false });
+    });
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearFieldErrors(form);
+
+    const clientOk = await validateAllOnSubmit(validators);
+    if (!clientOk) {
+      scrollToFirstError(form);
+      return;
+    }
+
+    const payload = {
+      email: (emailInput.value || '').trim().toLowerCase(),
+      password: passInput.value || '',
+      next: (nextInput?.value || '').trim(),
+    };
+
+    const csrfToken =
+      form.querySelector('input[name="csrfmiddlewaretoken"]')?.value || getCookie('csrftoken');
+
+    try {
+      const res = await fetch('/api/login/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-CSRFToken': csrfToken,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data.ok === false) {
+        showErrorsFromServer(data.errors);
+        if (!data.errors && data.message) showFieldError(emailInput, data.message, { autoHide: false });
+        scrollToFirstError(form);
+        return;
+      }
+
+      window.location.href = data.redirect || '/index/';
+    } catch {
+      showFieldError(emailInput, 'Ошибка сети. Попробуйте ещё раз.', { autoHide: false });
+      scrollToFirstError(form);
     }
   });
 });

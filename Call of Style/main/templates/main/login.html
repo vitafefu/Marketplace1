@@ -4,27 +4,47 @@
 
 {% block content %}
 <section class="login" role="form" style="padding: 50px 20px; max-width: 500px; margin: 0 auto;">
-    <h2 style="text-align:center; margin-bottom: 30px;">Вход</h2>
+  <h2 style="text-align:center; margin-bottom: 30px;">Вход</h2>
 
-    <form action="" method="POST" style="display:flex; flex-direction:column; gap:15px;">
-        {% csrf_token %}
+  <form id="login-form" action="" method="POST" style="display:flex; flex-direction:column; gap:15px;" novalidate>
+    {% csrf_token %}
 
-        <label for="email">Email</label>
-        <input type="email" id="email" name="email" placeholder="Введите email" required
-               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+    <!-- next для редиректа после входа -->
+    <input type="hidden" name="next" value="{{ request.GET.next|default:'' }}">
 
-        <label for="password">Пароль</label>
-        <input type="password" id="password" name="password" placeholder="Введите пароль" required
-               style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+    <label for="email">Email</label>
+    <div class="input-with-error">
+      <input type="email"
+             id="email"
+             name="email"
+             placeholder="Введите email"
+             autocomplete="email"
+             required
+             style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+    </div>
 
-        <button type="submit" style="padding:12px; background-color:#ff6b6b; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; transition: background-color 0.3s;">
-            Войти
-        </button>
-    </form>
+    <label for="password">Пароль</label>
+    <div class="input-with-error">
+      <input type="password"
+             id="password"
+             name="password"
+             placeholder="Введите пароль"
+             autocomplete="current-password"
+             required
+             style="padding:10px; border:1px solid #ccc; border-radius:5px; outline:none;">
+    </div>
 
-    <p style="margin-top:20px; text-align:center;">
-        Нет аккаунта?
-        <a href="{% url 'register' %}" style="color:#ff6b6b; text-decoration:none;">Зарегистрироваться</a>
-    </p>
+    <button type="submit"
+            style="padding:12px; background-color:#ff6b6b; color:#fff; border:none; border-radius:5px; cursor:pointer; font-weight:bold; transition: background-color 0.3s;">
+      Войти
+    </button>
+  </form>
+
+  <p style="margin-top:20px; text-align:center;">
+    Нет аккаунта?
+    <a href="{% url 'register' %}" style="color:#ff6b6b; text-decoration:none;">Зарегистрироваться</a>
+  </p>
 </section>
+
+{# Если хочешь — тут же можно подключить твой js, но обычно он уже в base.html #}
 {% endblock %}
