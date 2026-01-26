@@ -256,7 +256,16 @@ class Review(models.Model):
     ]
 
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reviews', verbose_name='Товар')
-    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='reviews', verbose_name='Автор')
+    author = models.ForeignKey(
+        CustomUser,
+        on_delete=models.SET_NULL,
+        related_name='reviews',
+        verbose_name='Автор',
+        null=True,
+        blank=True,
+    )
+    author_name_snapshot = models.CharField(max_length=150, verbose_name='Имя автора (снимок)')
+    author_email_snapshot = models.EmailField(blank=True, verbose_name='Email автора (снимок)')
 
     rating = models.IntegerField(choices=RATING_CHOICES, verbose_name='Оценка')
     title = models.CharField(max_length=200, blank=True, verbose_name='Заголовок')
@@ -277,8 +286,22 @@ class Review(models.Model):
             models.Index(fields=['author']),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.author and not self.author_name_snapshot:
+            self.author_name_snapshot = (
+                    self.author.first_name
+                    or self.author.email
+                    or "Пользователь"
+            )
+        if self.author and not self.author_email_snapshot:
+            self.author_email_snapshot = self.author.email or ""
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
-        who = (self.author.first_name or self.author.email or "Unknown")
+        if self.author:
+            who = (self.author.first_name or self.author.email or "Unknown")
+        else:
+            who = self.author_name_snapshot or "Unknown"
         return f"Отзыв на {self.product.title} от {who}"
 
 

@@ -92,118 +92,72 @@
 
     <!-- ===== Средний рейтинг ===== -->
     <div style="margin:20px 0;padding:15px;background:#f8f9fa;border-radius:10px;">
-        <b style="font-size:1.6rem;color:#ff6b6b;">{{ avg_rating }}/5</b>
-        <div>
+       <b id="avg-rating-value" style="font-size:1.6rem;color:#ff6b6b;">{{ avg_rating }}/5</b>
+        <div id="avg-rating-stars">
             {% for i in "12345" %}
                 {% if forloop.counter <= avg_rating|floatformat:0 %}⭐{% else %}☆{% endif %}
             {% endfor %}
         </div>
-        <small>Отзывов: {{ reviews.count }}</small>
+        <small>Отзывов: <span id="reviews-count">{{ reviews.count }}</span></small>
     </div>
 
+    <div id="review-toast" class="review-toast" role="status" aria-live="polite"></div>
+
     <!-- ===== Список отзывов ===== -->
-    {% for review in reviews %}
-        <div style="border:1px solid #eee;border-radius:10px;padding:20px;margin-bottom:20px;">
-            <b>{% if review.author.first_name %}{{ review.author.first_name }}{% else %}{{ review.author.email }}{% endif %}</b>
-            <div style="color:#ff6b6b;">
-                {% for i in "12345" %}
-                    {% if forloop.counter <= review.rating %}⭐{% else %}☆{% endif %}
-                {% endfor %}
-            </div>
-
-            <small>{{ review.created_at|date:"d.m.Y" }}</small>
-
-            {% if review.title %}
-                <h4>{{ review.title }}</h4>
-            {% endif %}
-
-            <p>{{ review.comment }}</p>
-
-            {% if user == review.author %}
-                <div style="display:flex;gap:10px;margin-top:10px;">
-                    <button class="btn-small" onclick="toggleEdit({{ review.id }})">✏️ Редактировать</button>
-                    <a href="{% url 'delete_review' review.id %}"
-                       class="btn-small"
-                       onclick="return confirm('Удалить отзыв?');">
-                        🗑 Удалить
-                    </a>
-                </div>
-
-                <!-- ===== Форма редактирования ===== -->
-                <form method="post"
-                      id="edit-form-{{ review.id }}"
-                      class="review-form"
-                      style="display:none;margin-top:15px;">
-                    {% csrf_token %}
-                    <input type="hidden" name="edit_review_id" value="{{ review.id }}">
-
-                    <div class="review-rating edit-rating">
-                      {% for i in "54321" %}
-                        {% with star=i|stringformat:"s" %}
-                          <input
-                            type="radio"
-                            id="edit-{{ review.id }}-star{{ star }}"
-                            name="rating"
-                            value="{{ star }}"
-                            {% if review.rating|stringformat:"s" == star %}checked{% endif %}
-                          >
-                          <label for="edit-{{ review.id }}-star{{ star }}">★</label>
-                        {% endwith %}
-                      {% endfor %}
-                    </div>
-
-                    <input type="text" name="title" value="{{ review.title }}">
-                    <textarea name="comment" rows="4">{{ review.comment }}</textarea>
-
-                    <button type="submit">💾 Сохранить</button>
-                </form>
-            {% endif %}
-        </div>
-    {% empty %}
-        <p style="text-align:center;color:#777;">Отзывов пока нет</p>
-    {% endfor %}
+    <div id="reviews-list">
+        {% for review in reviews %}
+            {% include "main/_review_card.html" with review=review %}
+        {% empty %}
+            <p id="reviews-empty" style="text-align:center;color:#777;">Отзывов пока нет</p>
+        {% endfor %}
+    </div>
 
     <!-- ===== Добавление отзыва ===== -->
     {% if user.is_authenticated %}
-        {% if not has_review %}
-            <form method="post" class="review-form">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="create">
+      <div id="review-form-wrapper" {% if has_review %}style="display:none;"{% endif %}>
+        <form method="post"
+              class="review-form"
+              id="review-create-form"
+              data-api-url="{% url 'api_review_create' %}">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="create">
+          <input type="hidden" name="product_id" value="{{ product.id }}">
 
-                <h3>Оставить отзыв</h3>
+          <h3>Оставить отзыв</h3>
 
-                <div class="review-rating">
-                    {% for i in "54321" %}
-                        <input type="radio"
-                               id="star{{ i }}"
-                               name="rating"
-                               value="{{ i }}"
-                               {% if form.initial.rating|stringformat:"s" == i %}checked{% endif %}>
-                        <label for="star{{ i }}">★</label>
-                    {% endfor %}
-                </div>
+          <div class="review-rating">
+            {% for i in "54321" %}
+              <input type="radio"
+                     id="star{{ i }}"
+                     name="rating"
+                     value="{{ i }}"
+                     {% if form.initial.rating|stringformat:"s" == i %}checked{% endif %}>
+              <label for="star{{ i }}">★</label>
+            {% endfor %}
+          </div>
+          <div class="form-error" data-error-for="rating"></div>
 
+          {{ form.title }}
+          <div class="form-error" data-error-for="title"></div>
+          {{ form.comment }}
+          <div class="form-error" data-error-for="comment"></div>
+          <div class="form-error" data-error-for="__all__"></div>
 
-                {{ form.title }}
-                {{ form.comment }}
+          <button type="submit">Отправить</button>
+        </form>
+      </div>
 
-                <button type="submit">Отправить</button>
-            </form>
-        {% else %}
-            <p style="color:#777;">Вы уже оставили отзыв</p>
-        {% endif %}
+      <p id="review-already-message"
+         class="review-info"
+         style="{% if not has_review %}display:none;{% endif %}color:#777;">
+        Вы уже оставили отзыв
+      </p>
     {% else %}
-        <a href="{% url 'login' %}?next={{ request.path }}">Войдите, чтобы оставить отзыв</a>
+      <a href="{% url 'login' %}?next={{ request.path }}">Войдите, чтобы оставить отзыв</a>
     {% endif %}
+
 </section>
 
-<script>
-function toggleEdit(id) {
-    const form = document.getElementById('edit-form-' + id);
-    if (form) {
-        form.style.display = form.style.display === 'none' ? 'block' : 'none';
-    }
-}
-</script>
+<script src="{% static 'main/js/reviews.js' %}"></script>
 
 {% endblock %}

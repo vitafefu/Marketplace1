@@ -9,6 +9,7 @@ from .views import RegisterView
 urlpatterns = [
     path('', views.home, name='home'),
     path('index/', views.index, name='index'),
+    path("api/search/suggest/", views.api_search_suggest, name="api_search_suggest"),
     path('profile/avatar/', views.profile_avatar_upload, name='profile_avatar_upload'),
     path('profile/avatar/delete/', views.profile_avatar_delete, name='profile_avatar_delete'),
     path("api/reverse-geocode/", views.api_reverse_geocode, name="api_reverse_geocode"),
@@ -30,6 +31,9 @@ urlpatterns = [
     path('support/<str:chat_type>/<int:product_id>/', views.support_chat, name='support_chat_product'),
     path('chat/<int:chat_id>/send/', views.send_message, name='send_message'),
     path('review/<int:review_id>/delete/', views.delete_review, name='delete_review'),
+    path('api/reviews/create/', views.api_review_create, name='api_review_create'),
+    path('api/reviews/<int:review_id>/update/', views.api_review_update, name='api_review_update'),
+    path('api/reviews/<int:review_id>/delete/', views.api_review_delete, name='api_review_delete'),
     path('catalog/', views.catalog_view, name='catalog'),
     path('add-product/', views.add_product, name='add_product'),
 

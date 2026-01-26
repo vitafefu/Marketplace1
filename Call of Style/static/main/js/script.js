@@ -1434,6 +1434,121 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 });
+// =================== SEARCH SUGGEST (API) ===================
+document.addEventListener("DOMContentLoaded", () => {
+  const form = document.getElementById("search-form");
+  const input = document.getElementById("search-input");
+  const box = document.getElementById("search-suggest");
+
+  console.log("[SEARCH] init", { form: !!form, input: !!input, box: !!box });
+
+  if (!form || !input || !box) return;
+
+  let t = null;
+  let activeIndex = -1;
+  let current = [];
+
+  const hide = () => {
+    box.style.display = "none";
+    box.innerHTML = "";
+    activeIndex = -1;
+    current = [];
+  };
+
+  const setActive = (idx) => {
+    const nodes = Array.from(box.querySelectorAll(".suggest-item"));
+    nodes.forEach((n) => n.classList.remove("is-active"));
+    if (idx >= 0 && idx < nodes.length) {
+      nodes[idx].classList.add("is-active");
+      nodes[idx].scrollIntoView({ block: "nearest" });
+    }
+  };
+
+  const render = (items) => {
+    box.innerHTML = "";
+    if (!items || !items.length) return hide();
+
+    current = items.slice(0, 10);
+    current.forEach((it, idx) => {
+      const div = document.createElement("div");
+      div.className = "suggest-item";
+      div.textContent = (it.label || "").trim();
+
+      div.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        input.value = div.textContent;
+        hide();
+        form.submit();
+      });
+
+      box.appendChild(div);
+    });
+
+    box.style.display = "block";
+  };
+
+  const fetchSuggest = async (q) => {
+    const url = `/api/search/suggest/?q=${encodeURIComponent(q)}`;
+    console.log("[SEARCH] fetch", url);
+
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    const data = await res.json().catch(() => ({}));
+
+    console.log("[SEARCH] response", data);
+    return (data && data.ok && Array.isArray(data.results)) ? data.results : [];
+  };
+
+  input.addEventListener("input", () => {
+    clearTimeout(t);
+    const q = (input.value || "").trim();
+
+    t = setTimeout(async () => {
+      if (q.length < 2) return hide();
+      try {
+        const items = await fetchSuggest(q);
+        render(items);
+      } catch (e) {
+        console.warn("[SEARCH] suggest error", e);
+        hide();
+      }
+    }, 150);
+  });
+
+  input.addEventListener("keydown", (e) => {
+    if (box.style.display !== "block") return;
+
+    const max = current.length - 1;
+    if (max < 0) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      activeIndex = Math.min(max, activeIndex + 1);
+      setActive(activeIndex);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      activeIndex = Math.max(0, activeIndex - 1);
+      setActive(activeIndex);
+    } else if (e.key === "Enter") {
+      if (activeIndex >= 0 && current[activeIndex]) {
+        e.preventDefault();
+        input.value = current[activeIndex].label;
+        hide();
+        form.submit();
+      }
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      hide();
+    }
+  });
+
+  document.addEventListener("mousedown", (e) => {
+    if (e.target === input) return;
+    if (box.contains(e.target)) return;
+    hide();
+  });
+
+  input.addEventListener("blur", () => setTimeout(hide, 120));
+});
 
 // =================== PROFILE / VALIDATION ===================
 document.addEventListener('DOMContentLoaded', () => {
@@ -1458,6 +1573,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const emailSpaceMessage = 'Email не должен содержать пробелы';
   const phoneErrorMessage = 'Введите корректный телефон (+ и 11–15 цифр)';
+  const nameSpaceMessage = 'Имя не должно содержать пробелы';
 
   const hasSpaces = (v) => /\s/.test(v || '');
   const normalizeEq = (s) => (s || '').trim().toLowerCase();
@@ -1589,8 +1705,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const value = (nameInput?.value || '').trim();
       if (!value) {
         if (ctx.fromSubmit) { showFieldError(nameInput, 'Введите имя', { autoHide: false }); return false; }
+        if (hasSpaces(value)) { showFieldError(nameInput, nameSpaceMessage, { autoHide: !ctx.fromSubmit }); return false; }
         return true;
       }
+
       if (value.length < 2) { showFieldError(nameInput, 'Имя минимум 2 символа', { autoHide: !ctx.fromSubmit }); return false; }
       clearFieldError(nameInput);
       return true;

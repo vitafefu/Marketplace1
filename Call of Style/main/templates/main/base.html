@@ -46,13 +46,23 @@
             </div>
 
             <div class="header-center">
-                <form method="GET" action="{% url 'catalog' %}" class="search-form">
-                    <input type="text" name="search" class="search-field"
-                           placeholder="Поиск товаров..." aria-label="Поиск"
-                           value="{{ request.GET.search }}">
-                    <button type="submit">Найти</button>
-                </form>
+              <form method="GET" action="{% url 'catalog' %}" class="search-form" id="search-form">
+                <input
+                  id="search-input"
+                  type="text"
+                  name="search"
+                  class="search-field"
+                  placeholder="Поиск товаров..."
+                  aria-label="Поиск"
+                  autocomplete="off"
+                  value="{{ request.GET.search }}"
+                >
+                <button type="submit">Найти</button>
+
+                <div id="search-suggest" class="suggest-box" style="display:none;"></div>
+              </form>
             </div>
+
 
             <div class="header-right">
                 {% if user.is_authenticated %}

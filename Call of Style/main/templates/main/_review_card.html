@@ -1,0 +1,70 @@
+<div class="review-card {% if not review.author %}review-deleted-user{% endif %}" data-review-id="{{ review.id }}" style="border:1px solid #eee;border-radius:10px;padding:20px;margin-bottom:20px;">
+    <div class="review-author">
+        {% if review.author %}
+            {% if review.author.first_name %}{{ review.author.first_name }}{% else %}{{ review.author.email }}{% endif %}
+        {% else %}
+            Удалённый аккаунт{% if review.author_name_snapshot %} ({{ review.author_name_snapshot }}){% endif %}
+        {% endif %}
+    </div>
+    <div class="review-rating-display" style="color:#ff6b6b;">
+        {% for i in "12345" %}
+            {% if forloop.counter <= review.rating %}⭐{% else %}☆{% endif %}
+        {% endfor %}
+    </div>
+
+    <small class="review-date">{{ review.created_at|date:"d.m.Y" }}</small>
+
+    {% if review.title %}
+        <h4>{{ review.title }}</h4>
+    {% endif %}
+
+    <p>{{ review.comment }}</p>
+
+    {% if user.is_authenticated %}
+        {% if user.is_staff or user.is_superuser or review.author == user %}
+            <div style="display:flex;gap:10px;margin-top:10px;">
+                <button class="btn-small review-edit-toggle" type="button" data-review-id="{{ review.id }}">✏️ Редактировать</button>
+                <a href="{% url 'delete_review' review.id %}"
+                   class="btn-small review-delete-btn"
+                   data-review-id="{{ review.id }}"
+                   data-api-url="{% url 'api_review_delete' review.id %}">
+                    🗑 Удалить
+                </a>
+            </div>
+
+            <form method="post"
+                  class="review-form review-edit-form"
+                  data-review-id="{{ review.id }}"
+                  data-api-url="{% url 'api_review_update' review.id %}"
+                  style="display:none;margin-top:15px;">
+                {% csrf_token %}
+                <input type="hidden" name="edit_review_id" value="{{ review.id }}">
+
+                <div class="review-rating edit-rating">
+                    {% for i in "54321" %}
+                        {% with star=i|stringformat:"s" %}
+                            <input
+                                type="radio"
+                                id="edit-{{ review.id }}-star{{ star }}"
+                                name="rating"
+                                value="{{ star }}"
+                                {% if review.rating|stringformat:"s" == star %}checked{% endif %}
+                            >
+                            <label for="edit-{{ review.id }}-star{{ star }}">★</label>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+                <div class="form-error" data-error-for="rating"></div>
+
+                <input type="text" name="title" value="{{ review.title }}">
+                <div class="form-error" data-error-for="title"></div>
+
+                <textarea name="comment" rows="4">{{ review.comment }}</textarea>
+                <div class="form-error" data-error-for="comment"></div>
+                <div class="form-error" data-error-for="__all__"></div>
+
+                <button type="submit">💾 Сохранить</button>
+            </form>
+        {% endif %}
+    {% endif %}
+</div>

@@ -1368,6 +1368,37 @@ body {
     font-size: 0.95rem;
 }
 
+.review-deleted-user {
+    opacity: 0.65;
+    filter: grayscale(1);
+}
+
+.review-deleted-user .review-author {
+    font-style: italic;
+}
+
+.form-error {
+    color: #cc2b2b;
+    font-size: 0.9rem;
+    margin: -8px 0 12px;
+}
+
+.review-toast {
+    position: sticky;
+    top: 10px;
+    margin-bottom: 15px;
+    padding: 10px 14px;
+    border-radius: 6px;
+    background: #2f2f2f;
+    color: #fff;
+    font-size: 0.95rem;
+    display: none;
+}
+
+.review-toast.is-visible {
+    display: inline-block;
+}
+
 /* Адаптив */
 @media (max-width: 768px) {
     .review-form {
@@ -1607,3 +1638,10 @@ body {
   display: block;
   box-sizing: border-box;
 }
+
+.search-form { position: relative; overflow: visible; }
+#search-suggest { top: calc(100% + 6px); } /* чуть ниже кнопки/инпута */
+.suggest-item.is-active { background:#f4f4f4; }
+#search-suggest { z-index: 99999; }
+.header, .header-center { overflow: visible; }
+

@@ -9,6 +9,7 @@ from django.core.paginator import Paginator
 from django.db.models import Avg, Q, Count
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.template.loader import render_to_string
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -226,6 +227,87 @@ def can_add_products(user):
         user.is_staff or user.groups.filter(name="Издатели").exists()
     )
 
+@require_GET
+def api_search_suggest(request):
+    q = (request.GET.get("q") or "").strip()
+    if len(q) < 2:
+        return JsonResponse({"ok": True, "results": []})
+
+    q_lower = q.lower()
+
+    results = []
+    seen = set()
+
+    def add(label: str, kind: str):
+        label = (label or "").strip()
+        if not label:
+            return
+        key = (kind, label.lower())
+        if key in seen:
+            return
+        seen.add(key)
+        results.append({"label": label})
+        return len(results) >= 10
+
+    # 1) Категории (если хочешь — удобно)
+    # Можно убрать этот блок, если не надо.
+    cats = (
+        Category.objects
+        .filter(name__icontains=q)
+        .values_list("name", flat=True)[:10]
+    )
+    for name in cats:
+        if add(name, "c"):
+            return JsonResponse({"ok": True, "results": results})
+
+    # 2) Товары: сначала title startswith, потом title contains
+    # Берём побольше, потом уникализируем.
+    p_qs = (
+        Product.objects
+        .filter(Q(title__icontains=q) | Q(brand__icontains=q))
+        .values("title", "brand")
+        [:60]
+    )
+
+    # небольшой “скоринг” прямо в python: startswith выше, чем contains
+    def score_title(t: str) -> int:
+        t = (t or "").strip().lower()
+        if not t:
+            return 999
+        if t.startswith(q_lower):
+            return 0
+        if q_lower in t:
+            return 1
+        return 5
+
+    def score_brand(b: str) -> int:
+        b = (b or "").strip().lower()
+        if not b:
+            return 999
+        if b.startswith(q_lower):
+            return 2
+        if q_lower in b:
+            return 3
+        return 6
+
+    rows = list(p_qs)
+    # сортируем, чтобы сначала шли лучшие совпадения по title
+    rows.sort(key=lambda r: (score_title(r.get("title")), score_brand(r.get("brand"))))
+
+    # 3) Добавляем title и brand
+    for row in rows:
+        title = row.get("title") or ""
+        brand = row.get("brand") or ""
+
+        # сначала название товара
+        if add(title, "t"):
+            break
+
+        # потом бренд
+        if brand and add(brand, "b"):
+            break
+
+    return JsonResponse({"ok": True, "results": results})
 
 # =========================
 # pages
@@ -490,7 +572,7 @@ def product_detail(request, product_id):
 def delete_review(request, review_id):
     review = get_object_or_404(Review, id=review_id)
 
-    if review.author != request.user:
+    if review.author != request.user and not (request.user.is_staff or request.user.is_superuser):
         return HttpResponseForbidden("Нет доступа")
 
     product_id = review.product.id
@@ -498,6 +580,112 @@ def delete_review(request, review_id):
     messages.success(request, 'Отзыв удалён')
     return redirect('product_detail', product_id=product_id)
 
+def _review_stats(product):
+    reviews = product.reviews.filter(is_approved=True)
+    avg_rating = reviews.aggregate(Avg('rating'))['rating__avg'] or 0
+    return round(avg_rating, 1), reviews.count()
+
+
+def _review_payload(request, review, product):
+    avg_rating, reviews_count = _review_stats(product)
+    html = render_to_string(
+        "main/_review_card.html",
+        {"review": review, "user": request.user},
+        request=request,
+    )
+    return {
+        "ok": True,
+        "review": {
+            "id": review.id,
+            "rating": review.rating,
+            "title": review.title,
+            "comment": review.comment,
+            "created_at": review.created_at.strftime("%d.%m.%Y"),
+        },
+        "html": html,
+        "avg_rating": avg_rating,
+        "reviews_count": reviews_count,
+    }
+
+
+def _form_errors(form):
+    errors = {}
+    for field, field_errors in form.errors.items():
+        errors[field] = [str(err) for err in field_errors]
+    return errors
+
+
+@login_required
+@require_POST
+def api_review_create(request):
+    product = get_object_or_404(Product, id=request.POST.get("product_id"))
+
+    if Review.objects.filter(product=product, author=request.user).exists():
+        return JsonResponse(
+            {"ok": False, "errors": {"__all__": ["Вы уже оставили отзыв"]}},
+            status=400,
+        )
+
+    form = ReviewForm(request.POST)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": _form_errors(form)}, status=400)
+
+    review = form.save(commit=False)
+    review.product = product
+    review.author = request.user
+    review.is_approved = True
+    review.save()
+
+    return JsonResponse(_review_payload(request, review, product))
+
+
+@login_required
+@require_POST
+def api_review_update(request, review_id):
+    review = get_object_or_404(Review, id=review_id)
+
+    can_edit = review.author == request.user or request.user.is_staff or request.user.is_superuser
+
+    if not can_edit:
+        return JsonResponse(
+            {"ok": False, "errors": {"__all__": ["Нет доступа"]}},
+            status=403,
+        )
+
+    form = ReviewForm(request.POST, instance=review)
+    if not form.is_valid():
+        return JsonResponse({"ok": False, "errors": _form_errors(form)}, status=400)
+
+    form.save()
+
+    return JsonResponse(_review_payload(request, review, review.product))
+
+
+@login_required
+@require_POST
+def api_review_delete(request, review_id):
+    review = get_object_or_404(Review, id=review_id)
+    product = review.product
+
+    can_delete = review.author == request.user or request.user.is_staff or request.user.is_superuser
+
+    if not can_delete:
+        return JsonResponse(
+            {"ok": False, "errors": {"__all__": ["Нет доступа"]}},
+            status=403,
+        )
+
+    review.delete()
+    avg_rating, reviews_count = _review_stats(product)
+    return JsonResponse(
+        {
+            "ok": True,
+            "review": {"id": review_id},
+            "html": "",
+            "avg_rating": avg_rating,
+            "reviews_count": reviews_count,
+        }
+    )
 
 # =========================
 # chat
