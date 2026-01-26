@@ -1,6 +1,8 @@
 from django import forms
 from django.db import transaction
 from .models import Review, CustomUser, Profile, Country, City
+from datetime import date
+
 class ReviewForm(forms.ModelForm):
     class Meta:
         model = Review
@@ -23,12 +25,12 @@ class ProfileUpdateForm(forms.Form):
     country_id = forms.IntegerField(required=True)
     city_id = forms.IntegerField(required=True)
 
-    phone = forms.CharField(required=False, max_length=20)
-    birth_date = forms.DateField(required=False, input_formats=["%Y-%m-%d"])
+    phone = forms.CharField(required=True, max_length=20)
+    birth_date = forms.DateField(required=True, input_formats=["%Y-%m-%d"])
 
     # Profile
     avatar = forms.ImageField(required=False)
-    gender = forms.ChoiceField(required=False, choices=Profile.GENDER_CHOICES)
+    gender = forms.ChoiceField(required=True, choices=Profile.GENDER_CHOICES)
     social_link = forms.CharField(required=False, max_length=255)
     bio = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 3}))
 
@@ -47,6 +49,24 @@ class ProfileUpdateForm(forms.Form):
         if CustomUser.objects.filter(email__iexact=email).exclude(pk=self.user.pk).exists():
             raise forms.ValidationError("Этот email уже занят")
         return email
+
+    def clean_birth_date(self):
+        bd = self.cleaned_data.get("birth_date")
+        if not bd:
+            return bd  # поле необязательное
+
+        today = date.today()
+
+        # границы
+        if bd > today or bd < date(1900, 1, 1):
+            raise forms.ValidationError("Введите корректную дату рождения")
+
+        # возраст >= 14
+        age = today.year - bd.year - ((today.month, today.day) < (bd.month, bd.day))
+        if age < 14:
+            raise forms.ValidationError("Вам должно быть не менее 14 лет")
+
+        return bd
 
     def clean(self):
         cleaned = super().clean()
@@ -120,3 +140,4 @@ class ProfileUpdateForm(forms.Form):
         prof.save()
 
         return u
+

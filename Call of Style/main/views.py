@@ -374,7 +374,10 @@ def toggle_favorite(request, product_id):
         messages.success(request, "Добавлено в избранное")
 
     # возвращаемся туда, откуда пришли (страница товара или каталог)
-    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/index/"
+    next_url = request.POST.get("next") or request.META.get("HTTP_REFERER") or "/profile/#favorites"
+    if not url_has_allowed_host_and_scheme(next_url, allowed_hosts={request.get_host()}):
+        next_url = "/profile/#favorites"
+
     return redirect(next_url)
 
 # =========================

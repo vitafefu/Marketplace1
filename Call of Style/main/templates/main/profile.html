@@ -6,331 +6,452 @@
 
 {% block content %}
 <div class="profile-layout">
-    <!-- Боковая панель -->
-    <aside class="profile-sidebar">
-        <div class="user-info">
-            <div id="sidebar-avatar-box">
+
+  <!-- ===== SIDEBAR ===== -->
+  <aside class="profile-sidebar">
+    <div class="user-info">
+      <div id="sidebar-avatar-box">
+        {% if user.profile.avatar %}
+          <img src="{{ user.profile.avatar.url }}" class="user-avatar-large js-avatar-img">
+        {% else %}
+          <div class="default-avatar-large js-avatar-placeholder">👤</div>
+        {% endif %}
+      </div>
+
+      <h3>{{ user|display_name:10 }}</h3>
+      <p>{{ user.get_user_type_display }}</p>
+    </div>
+
+    <nav class="profile-nav">
+      <a href="#profile" class="nav-item active">Профиль</a>
+      <a href="#reviews" class="nav-item">Мои отзывы</a>
+      <a href="#favorites" class="nav-item">Избранное</a>
+
+      {% if user.can_sell %}
+        <a href="{% url 'add_product' %}" class="nav-item">Добавить товар</a>
+        <a href="#my_products" class="nav-item">Мои товары</a>
+      {% else %}
+        <a href="{% url 'support_chat' 'support' %}" class="nav-item">🛠️ Техподдержка</a>
+      {% endif %}
+
+      <form method="POST" action="{% url 'logout' %}" class="logout-form">
+        {% csrf_token %}
+        <button type="submit" class="nav-item logout-btn">Выйти</button>
+      </form>
+    </nav>
+  </aside>
+
+  <!-- ===== CONTENT ===== -->
+  <main class="profile-content">
+
+    <!-- ================= PROFILE ================= -->
+    <section id="profile" class="content-section active">
+      <h2>Профиль</h2>
+
+      <form id="profile-form"
+            method="POST"
+            enctype="multipart/form-data"
+            class="product-form"
+            style="box-shadow:none;padding:0"
+            novalidate>
+        {% csrf_token %}
+        <input type="hidden" name="action" value="update_profile">
+
+        <!-- ===== AVATAR ===== -->
+        <div class="form-group">
+          <label>Аватар</label>
+
+          <div style="display:flex;gap:12px;align-items:center">
+            <div id="avatar-box">
               {% if user.profile.avatar %}
-                <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="user-avatar-large js-avatar-img">
+                <img id="avatar-img" src="{{ user.profile.avatar.url }}" class="user-avatar-large js-avatar-img">
               {% else %}
                 <div class="default-avatar-large js-avatar-placeholder">👤</div>
               {% endif %}
             </div>
 
-            <h3>{{ user|display_name:10 }}</h3>
-            <p>{{ user.get_user_type_display }}</p>
+            <div style="flex:1">
+              <input id="avatar-input" type="file" accept="image/*"
+                     {% if user.profile.avatar %}disabled{% endif %}>
+
+              <button id="avatar-delete-btn" type="button"
+                      class="btn-small"
+                      style="background:#dc3545;margin-top:10px;{% if not user.profile.avatar %}display:none{% endif %}">
+                Удалить
+              </button>
+
+              <small id="avatar-hint"
+                     style="display:block;margin-top:6px;color:#777;{% if not user.profile.avatar %}display:none{% endif %}">
+                Чтобы загрузить новый — сначала удалите текущий
+              </small>
+
+              <div id="avatar-status" style="margin-top:8px;color:#777;font-size:.9rem"></div>
+            </div>
+          </div>
         </div>
 
-        <nav class="profile-nav">
-            <a href="#profile" class="nav-item active">Профиль</a>
-            <a href="#reviews" class="nav-item">Мои отзывы</a>
-            <a href="#favorites" class="nav-item">Избранное</a>
-
-            {% if user.can_sell %}
-                <a href="{% url 'add_product' %}" class="nav-item">Добавить товар</a>
-                <a href="#my_products" class="nav-item">Мои товары</a>
-            {% else %}
-                <a href="{% url 'support_chat' 'support' %}" class="nav-item">🛠️ Техподдержка</a>
-            {% endif %}
-
-            <form method="POST" action="{% url 'logout' %}" class="logout-form">
-                {% csrf_token %}
-                <button type="submit" class="nav-item logout-btn">Выйти</button>
-            </form>
-        </nav>
-    </aside>
-
-    <!-- Основной контент -->
-    <main class="profile-content">
-        <!-- Профиль -->
-        <section id="profile" class="content-section active">
-          <h2>Профиль</h2>
-
-          <form method="POST" enctype="multipart/form-data" class="product-form" style="box-shadow:none; padding:0;">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="update_profile">
-
-            <!-- Аватар -->
-            <div class="form-group">
-              <label>Аватар</label>
-
-              <div style="display:flex; gap:12px; align-items:center;">
-                <div id="avatar-box">
-                  {% if user.profile.avatar %}
-                    <img id="avatar-img" src="{{ user.profile.avatar.url }}" class="user-avatar-large js-avatar-img" alt="Аватар">
-                  {% else %}
-                    <div id="avatar-placeholder" class="default-avatar-large js-avatar-placeholder">👤</div>
-                  {% endif %}
-                </div>
-
-
-                <div style="flex:1;">
-                  <input id="avatar-input"
-                         type="file"
-                         accept="image/*"
-                         {% if user.profile.avatar %}disabled{% endif %}>
-
-                  <button id="avatar-delete-btn"
-                          type="button"
-                          class="btn-small"
-                          style="background:#dc3545;margin-top:10px;{% if not user.profile.avatar %}display:none;{% endif %}">
-                    Удалить
-                  </button>
-
-                  <small id="avatar-hint" style="display:block;margin-top:6px;color:#777;{% if not user.profile.avatar %}display:none;{% endif %}">
-                    Чтобы загрузить новый — сначала удалите текущий.
-                  </small>
-
-                  <div id="avatar-status" style="margin-top:8px;color:#777;font-size:.9rem;"></div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Имя -->
-            <div class="form-group auth-input-group">
-              <label>Имя *</label>
-              <div class="input-with-error">
-                <input type="text" name="name" required value="{{ profile_form.name.value|default_if_none:'' }}">
-              </div>
-              {% if profile_form.name.errors %}
-                <small class="field-error">{{ profile_form.name.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <!-- Email -->
-            <div class="form-group auth-input-group">
-              <label>Email *</label>
-              <div class="input-with-error">
-                <input type="email" name="email" required value="{{ profile_form.email.value|default_if_none:'' }}">
-              </div>
-              {% if profile_form.email.errors %}
-                <small class="field-error">{{ profile_form.email.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <!-- Страна -->
-            <div class="form-group auth-input-group">
-              <label>Страна *</label>
-              <div class="input-with-error" style="position:relative;">
-                <input type="text" id="country-input" placeholder="Начните ввод..." autocomplete="off"
-                       value="{% if user.country %}{{ user.country.name }}{% endif %}" required>
-                <div id="country-suggest" class="suggest-box" style="display:none;"></div>
-              </div>
-              {% if profile_form.country_id.errors %}
-                <small class="field-error">{{ profile_form.country_id.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <!-- Город -->
-            <div class="form-group auth-input-group">
-              <label>Город *</label>
-              <div class="input-with-error" style="position:relative;">
-                <input type="text" id="city-input" placeholder="Начните ввод..." autocomplete="off"
-                       value="{% if user.city %}{{ user.city.name }}{% endif %}" required>
-                <div id="city-suggest" class="suggest-box" style="display:none;"></div>
-              </div>
-              {% if profile_form.city_id.errors %}
-                <small class="field-error">{{ profile_form.city_id.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <!-- hidden IDs (ВАЖНО: name совпадает с form полями) -->
-            <input type="hidden" name="country_id" id="country-id" value="{{ profile_form.country_id.value|default_if_none:'' }}">
-            <input type="hidden" name="city_id" id="city-id" value="{{ profile_form.city_id.value|default_if_none:'' }}">
-            <input type="hidden" id="phone-code" value="{% if user.country %}{{ user.country.phone_code }}{% endif %}">
-
-            <div class="form-row">
-              <div class="form-group auth-input-group">
-                <label>Телефон</label>
-                <div class="input-with-error">
-                  <input type="text" name="phone" id="phone-input" class="phone-input"
-                         value="{{ profile_form.phone.value|default_if_none:'' }}"
-                         placeholder="{% if user.country and user.country.phone_code %}{{ user.country.phone_code }}...{% else %}+...{% endif %}">
-                </div>
-                {% if profile_form.phone.errors %}
-                  <small class="field-error">{{ profile_form.phone.errors.0 }}</small>
-                {% endif %}
-              </div>
-
-              <div class="form-group auth-input-group">
-                <label>Дата рождения</label>
-                <div class="input-with-error">
-                  <input type="date" name="birth_date" value="{{ profile_form.birth_date.value|default_if_none:'' }}">
-                </div>
-                {% if profile_form.birth_date.errors %}
-                  <small class="field-error">{{ profile_form.birth_date.errors.0 }}</small>
-                {% endif %}
-              </div>
-            </div>
-
-            <!-- Пол -->
-            <div class="form-group auth-input-group">
-              <label>Пол</label>
-              <div class="gender-group">
-                <label class="gender-btn">
-                  <input type="radio" name="gender" value="male" {% if profile_form.gender.value == "male" %}checked{% endif %}>
-                  <span>Мужчина</span>
-                </label>
-                <label class="gender-btn">
-                  <input type="radio" name="gender" value="female" {% if profile_form.gender.value == "female" %}checked{% endif %}>
-                  <span>Женщина</span>
-                </label>
-              </div>
-              {% if profile_form.gender.errors %}
-                <small class="field-error">{{ profile_form.gender.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <!-- Соцсеть -->
-            <div class="form-group auth-input-group">
-              <label>Ссылка на соцсеть</label>
-              <div class="input-with-error">
-                <input type="text" name="social_link" placeholder="https://..." value="{{ profile_form.social_link.value|default_if_none:'' }}">
-              </div>
-              {% if profile_form.social_link.errors %}
-                <small class="field-error">{{ profile_form.social_link.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <!-- О себе -->
-            <div class="form-group auth-input-group">
-              <label>О себе</label>
-              <div class="input-with-error">
-                <textarea name="bio" rows="4" placeholder="Расскажите немного о себе...">{{ profile_form.bio.value|default_if_none:'' }}</textarea>
-              </div>
-              {% if profile_form.bio.errors %}
-                <small class="field-error">{{ profile_form.bio.errors.0 }}</small>
-              {% endif %}
-            </div>
-
-            <button type="submit" class="btn-primary">💾 Сохранить</button>
-          </form>
-        </section>
-
-        <!-- Блок отзывов -->
-        <section id="reviews" class="content-section">
-            <h2>Мои отзывы</h2>
-
-            {% if user_reviews %}
-                {% for review in user_reviews %}
-                <div class="review-card">
-                    <div class="review-header">
-                        <span class="product-name">{{ review.product.title }}</span>
-
-                        <div class="review-rating">
-                            {% for i in "12345" %}
-                                {% if forloop.counter <= review.rating %}⭐{% else %}☆{% endif %}
-                            {% endfor %}
-                        </div>
-                    </div>
-
-                    {% if review.comment %}
-                        <p class="review-comment">{{ review.comment }}</p>
-                    {% endif %}
-
-                    <div class="review-date">{{ review.created_at|date:"d.m.Y" }}</div>
-                </div>
-                {% endfor %}
-            {% else %}
-                <div class="empty-state">
-                    <p>Вы ещё не оставляли отзывы</p>
-                </div>
-            {% endif %}
-        </section>
-        <!-- Избранное -->
-        <section id="favorites" class="content-section">
-          <h2>❤ Избранное</h2>
-
-          <div class="row g-3">
-            {% for product in favorite_products %}
-              <div class="col-6 col-md-6 col-lg-4">
-                {% include "main/_product_card.html" with product=product %}
-              </div>
-            {% empty %}
-              <div class="empty-state">
-                <p>В избранном пока пусто</p>
-                <a href="{% url 'catalog' %}" class="btn-primary">Перейти в каталог</a>
-              </div>
-            {% endfor %}
+        <!-- ===== NAME ===== -->
+        <div class="form-group auth-input-group">
+          <label>Имя *</label>
+          <div class="input-with-error">
+            <input id="profile-name"
+                   type="text"
+                   name="name"
+                   required
+                   value="{{ profile_form.name.value|default_if_none:'' }}">
           </div>
-        </section>
-        <!-- Мои товары -->
-        <section id="my_products" class="content-section">
-            <h2>🛍️ Мои товары</h2>
+          {% if profile_form.name.errors %}
+            <small class="field-error">{{ profile_form.name.errors.0 }}</small>
+          {% endif %}
+        </div>
 
-            <div class="products-actions">
-                <a href="{% url 'add_product' %}" class="btn-primary">+ Добавить товар</a>
+        <!-- ===== EMAIL ===== -->
+        <div class="form-group auth-input-group">
+          <label>Email *</label>
+          <div class="input-with-error">
+            <input id="profile-email"
+                   type="email"
+                   name="email"
+                   required
+                   value="{{ profile_form.email.value|default_if_none:'' }}">
+          </div>
+          {% if profile_form.email.errors %}
+            <small class="field-error">{{ profile_form.email.errors.0 }}</small>
+          {% endif %}
+        </div>
+
+        <!-- ===== COUNTRY ===== -->
+        <div class="form-group auth-input-group">
+          <label>Страна *</label>
+          <div class="input-with-error" style="position:relative">
+            <input id="country-input"
+                   type="text"
+                   placeholder="Начните ввод..."
+                   autocomplete="off"
+                   required
+                   value="{% if user.country %}{{ user.country.name }}{% endif %}">
+            <div id="country-suggest" class="suggest-box" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- ===== CITY ===== -->
+        <div class="form-group auth-input-group">
+          <label>Город *</label>
+          <div class="input-with-error" style="position:relative">
+            <input id="city-input"
+                   type="text"
+                   placeholder="Начните ввод..."
+                   autocomplete="off"
+                   required
+                   value="{% if user.city %}{{ user.city.name }}{% endif %}">
+            <div id="city-suggest" class="suggest-box" style="display:none"></div>
+          </div>
+        </div>
+
+        <!-- hidden bindings -->
+        <input type="hidden" name="country_id" id="country-id"
+               value="{{ profile_form.country_id.value|default_if_none:'' }}">
+        <input type="hidden" name="city_id" id="city-id"
+               value="{{ profile_form.city_id.value|default_if_none:'' }}">
+        <input type="hidden" id="phone-code"
+               value="{% if user.country %}{{ user.country.phone_code }}{% endif %}">
+
+        <div class="form-row">
+          <!-- PHONE -->
+          <div class="form-group auth-input-group">
+            <label>Телефон</label>
+            <div class="input-with-error">
+              <input id="phone-input"
+                     class="phone-input"
+                     type="text"
+                     name="phone"
+                     placeholder="+..."
+                     value="{{ profile_form.phone.value|default_if_none:'' }}">
             </div>
+          </div>
 
-            <div class="products-list">
-                {% for product in user.products.all %}
-                <div class="product-item">
-                    <div class="product-image">
-                        {% if product.images.first %}
-                            <img src="{{ product.images.first.image.url }}" alt="{{ product.title }}">
-                        {% else %}
-                            <div class="no-image">📷</div>
-                        {% endif %}
-                    </div>
+          <!-- BIRTH DATE -->
+          <div class="form-group auth-input-group">
+            <label>Дата рождения</label>
 
-                    <div class="product-info">
-                        <h4>{{ product.title }}</h4>
-                        <p class="product-status {{ product.status }}">
-                            Статус: {{ product.get_status_display }}
-                        </p>
-                    </div>
-
-                    <div class="product-actions">
-                        <a href="{% url 'product_detail' product.id %}" class="btn-small">👁️ Просмотр</a>
-                        <a href="#" class="btn-small">✏️ Редактировать</a>
-                    </div>
+            <div class="input-with-error">
+              {% if profile_form.birth_date.errors %}
+                <div class="field-error-tooltip">
+                  <div class="field-error-tooltip-content">
+                    {{ profile_form.birth_date.errors.0 }}
+                  </div>
                 </div>
-                {% empty %}
-                <div class="empty-state">
-                    <p>У вас пока нет товаров</p>
-                    <a href="{% url 'add_product' %}" class="btn-primary">Добавить первый товар</a>
-                </div>
+              {% endif %}
+
+              <input type="date"
+                     name="birth_date"
+                     max="{% now 'd-m-Y' %}"
+                     min="01-01-1900"
+                     value="{{ profile_form.birth_date.value|default_if_none:'' }}"
+                     class="{% if profile_form.birth_date.errors %}error{% endif %}">
+            </div>
+          </div>
+
+        </div>
+
+        <!-- ===== GENDER ===== -->
+        <div class="form-group auth-input-group">
+          <label>Пол</label>
+          <div class="gender-group">
+            <label class="gender-btn">
+              <input type="radio" name="gender" value="male"
+                     {% if profile_form.gender.value == 'male' %}checked{% endif %}>
+              <span>Мужчина</span>
+            </label>
+            <label class="gender-btn">
+              <input type="radio" name="gender" value="female"
+                     {% if profile_form.gender.value == 'female' %}checked{% endif %}>
+              <span>Женщина</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- ===== SOCIAL ===== -->
+        <div class="form-group auth-input-group">
+          <label>Ссылка на соцсеть</label>
+          <div class="input-with-error">
+            <input type="text"
+                   name="social_link"
+                   placeholder="https://..."
+                   value="{{ profile_form.social_link.value|default_if_none:'' }}">
+          </div>
+        </div>
+
+        <!-- ===== BIO ===== -->
+        <div class="form-group auth-input-group">
+          <label>О себе</label>
+          <div class="input-with-error">
+            <textarea name="bio" rows="4"
+                      placeholder="Расскажите немного о себе...">{{ profile_form.bio.value|default_if_none:'' }}</textarea>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-primary">💾 Сохранить</button>
+      </form>
+    </section>
+
+    <!-- остальные секции (reviews / favorites / my_products) -->
+    <!-- ================= REVIEWS ================= -->
+    <section id="reviews" class="content-section">
+      <h2>Мои отзывы</h2>
+
+      {% if user_reviews %}
+        {% for review in user_reviews %}
+          <div class="review-card">
+            <div class="review-header">
+              <span class="product-name">{{ review.product.title }}</span>
+              <div class="review-rating">
+                {% for i in "12345" %}
+                  {% if forloop.counter <= review.rating %}⭐{% else %}☆{% endif %}
                 {% endfor %}
+              </div>
             </div>
-        </section>
-    </main>
+
+            {% if review.comment %}
+              <p class="review-comment">{{ review.comment }}</p>
+            {% endif %}
+
+            <div class="review-date">{{ review.created_at|date:"d.m.Y" }}</div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty-state"><p>Вы ещё не оставляли отзывы</p></div>
+      {% endif %}
+    </section>
+
+    <!-- ================= FAVORITES ================= -->
+    <section id="favorites" class="content-section">
+      <h2>❤ Избранное</h2>
+
+      <div class="row g-3 profile-fav-grid">
+        {% for product in favorite_products %}
+          <div class="col-6 col-md-6 col-lg-4">
+            {% include "main/_product_card.html" with product=product %}
+          </div>
+        {% empty %}
+          <div class="empty-state">
+            <p>В избранном пока пусто</p>
+            <a href="{% url 'catalog' %}" class="btn-primary">Перейти в каталог</a>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+
+    <!-- ================= MY PRODUCTS ================= -->
+    {% if user.can_sell %}
+    <section id="my_products" class="content-section">
+      <h2>🛍️ Мои товары</h2>
+
+      <div class="products-actions">
+        <a href="{% url 'add_product' %}" class="btn-primary">+ Добавить товар</a>
+      </div>
+
+      <div class="products-list">
+        {% for product in user.products.all %}
+          <div class="product-item">
+            <div class="product-image">
+              {% if product.images.first %}
+                <img src="{{ product.images.first.image.url }}" alt="{{ product.title }}">
+              {% else %}
+                <div class="no-image">📷</div>
+              {% endif %}
+            </div>
+
+            <div class="product-info">
+              <h4>{{ product.title }}</h4>
+              <p class="product-status {{ product.status }}">
+                Статус: {{ product.get_status_display }}
+              </p>
+            </div>
+
+            <div class="product-actions">
+              <a href="{% url 'product_detail' product.id %}" class="btn-small">👁️ Просмотр</a>
+              <a href="{% url 'edit_product' product.id %}" class="btn-small">✏️ Редактировать</a>
+            </div>
+          </div>
+        {% empty %}
+          <div class="empty-state">
+            <p>У вас пока нет товаров</p>
+            <a href="{% url 'add_product' %}" class="btn-primary">Добавить первый товар</a>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+    {% endif %}
+
+
+  </main>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
-  const navItems = document.querySelectorAll('.profile-nav a.nav-item'); // только ссылки, НЕ logout button
-  const contentSections = document.querySelectorAll('.profile-content .content-section');
+document.addEventListener('DOMContentLoaded', () => {
+  const nav = document.querySelectorAll('.profile-nav .nav-item');
+  const sections = document.querySelectorAll('.content-section');
 
-  function activateSection(id) {
-    navItems.forEach(a => a.classList.remove('active'));
-    contentSections.forEach(s => s.classList.remove('active'));
-
-    const link = document.querySelector('.profile-nav a.nav-item[href="#' + id + '"]');
-    const section = document.getElementById(id);
-
-    if (link) link.classList.add('active');
-    if (section) section.classList.add('active');
+  function activate(id) {
+    nav.forEach(a => a.classList.remove('active'));
+    sections.forEach(s => s.classList.remove('active'));
+    document.querySelector(`.profile-nav a[href="#${id}"]`)?.classList.add('active');
+    document.getElementById(id)?.classList.add('active');
   }
 
-  // клик по меню
-  navItems.forEach(a => {
-    a.addEventListener('click', function (e) {
-      const href = this.getAttribute('href') || '';
-      if (!href.startsWith('#')) return; // на всякий
+  nav.forEach(a => {
+    a.addEventListener('click', e => {
+      if (!a.getAttribute('href').startsWith('#')) return;
       e.preventDefault();
-      const id = href.slice(1);
-      activateSection(id);
-      history.replaceState(null, '', '#' + id);
+      const id = a.getAttribute('href').slice(1);
+      activate(id);
+      history.replaceState(null, '', `#${id}`);
     });
   });
 
-  // если зашли с хэшем (/profile/#reviews)
-  const hash = (location.hash || '').replace('#', '');
-  if (hash && document.getElementById(hash)) {
-    activateSection(hash);
-  } else {
-    activateSection('profile');
+  activate(location.hash.replace('#','') || 'profile');
+});
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const bd = document.querySelector('input[name="birth_date"]');
+  if (!bd) return;
+
+  function ensureTooltipWrap(input){
+    // ищем ближайший .input-with-error
+    let wrap = input.closest('.input-with-error');
+    if (!wrap){
+      // fallback: обернём сами
+      wrap = document.createElement('div');
+      wrap.className = 'input-with-error';
+      input.parentNode.insertBefore(wrap, input);
+      wrap.appendChild(input);
+    }
+    return wrap;
+  }
+
+  function showError(input, msg){
+    const wrap = ensureTooltipWrap(input);
+
+    // tooltip container
+    let tip = wrap.querySelector('.field-error-tooltip');
+    if (!tip){
+      tip = document.createElement('div');
+      tip.className = 'field-error-tooltip';
+      tip.innerHTML = `<div class="field-error-tooltip-content"></div>`;
+      wrap.insertBefore(tip, input);
+    }
+    tip.querySelector('.field-error-tooltip-content').textContent = msg;
+
+    input.classList.add('error');
+  }
+
+  function clearError(input){
+    const wrap = input.closest('.input-with-error');
+    const tip = wrap ? wrap.querySelector('.field-error-tooltip') : null;
+    if (tip) tip.remove();
+    input.classList.remove('error');
+  }
+
+  function validateBirthDate(){
+    const v = (bd.value || '').trim();
+    if (!v) { clearError(bd); return true; }
+
+    // формат YYYY-MM-DD (инпут date обычно сам даёт, но на всякий)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(v)){
+      showError(bd, 'Введите дату в формате ГГГГ-ММ-ДД');
+      return false;
+    }
+
+    const d = new Date(v + 'T00:00:00');
+    if (Number.isNaN(d.getTime())){
+      showError(bd, 'Введите корректную дату');
+      return false;
+    }
+
+    const min = new Date('1900-01-01T00:00:00');
+    const today = new Date(); today.setHours(0,0,0,0);
+
+    if (d < min){
+      showError(bd, 'Слишком ранняя дата рождения');
+      return false;
+    }
+    if (d > today){
+      showError(bd, 'Дата рождения не может быть в будущем');
+      return false;
+    }
+
+    // возраст >= 14
+    let age = today.getFullYear() - d.getFullYear();
+    const m = today.getMonth() - d.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--;
+
+    if (age < 14){
+      showError(bd, 'Вам должно быть не менее 14 лет');
+      return false;
+    }
+
+    clearError(bd);
+    return true;
+  }
+
+  bd.addEventListener('blur', validateBirthDate);
+  bd.addEventListener('input', validateBirthDate);
+
+  // и на submit тоже стопаем
+  const form = bd.closest('form');
+  if (form){
+    form.addEventListener('submit', (e) => {
+      if (!validateBirthDate()){
+        e.preventDefault();
+        bd.focus();
+      }
+    });
   }
 });
 </script>
+
 {% endblock %}
+
