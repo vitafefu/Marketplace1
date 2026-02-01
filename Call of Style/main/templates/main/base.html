@@ -1,214 +1,217 @@
-
 {% load static user_extras %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Call of Style{% endblock %}</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{% static 'main/css/styles.css' %}">
-    <script defer src="{% static 'main/js/script.js' %}?v=999"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Call of Style{% endblock %}</title>
 
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'main/css/styles.css' %}">
+  <script defer src="{% static 'main/js/script.js' %}?v=999"></script>
 </head>
 <body>
-    <!-- ===================== Верхний информационный бар ===================== -->
-    <div class="top-bar">
-      <div class="top-bar-content">
-        <div class="top-bar-left">
-          <div id="location-wrap"
+  <!-- ===================== Верхний информационный бар ===================== -->
+  <div class="top-bar">
+    <div class="top-bar-content">
+      <div class="top-bar-left">
+        <div id="location-wrap"
              class="location-wrap"
              data-auth="{% if user.is_authenticated %}1{% else %}0{% endif %}"
              data-user-city="{{ user.city.name|default_if_none:'' }}"
-             data-user-country="{{ user.country.name|default_if_none:'' }}"
-        >
+             data-user-country="{{ user.country.name|default_if_none:'' }}">
           <span id="location-display" class="location-display">Нажмите, чтобы указать</span>
-
-          <input id="location-input" class="location" type="text" style="display:none;" autocomplete="off" />
-
+          <input id="location-input" class="location" type="text" style="display:none;" autocomplete="off">
           <div id="location-suggest" class="suggest-box" style="display:none;"></div>
-        </div>
-
-        </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <div class="main-container">
-        <!-- ===================== Шапка ===================== -->
-        <header class="header">
-            <div class="header-left">
-                <button class="menu-btn" aria-label="Меню">☰</button>
-                <a href="{% url 'home' %}" class="logo-link">
-                    <img src="{% static 'main/img/Logo main.png' %}" alt="Call of Style"
-                         style="height: 80px; width: 145px; object-fit: contain;" class="logo-img">
-                </a>
-            </div>
+  <div class="main-container">
+    <!-- ===================== Шапка ===================== -->
+    <header class="header">
+      <div class="header-left">
+        <button class="menu-btn" aria-label="Меню">☰</button>
+        <a href="{% url 'home' %}" class="logo-link">
+          <img src="{% static 'main/img/Logo main.png' %}"
+               alt="Call of Style"
+               style="height: 80px; width: 145px; object-fit: contain;"
+               class="logo-img">
+        </a>
+      </div>
 
-            <div class="header-center">
-              <form method="GET" action="{% url 'catalog' %}" class="search-form" id="search-form">
-                <input
-                  id="search-input"
-                  type="text"
-                  name="search"
-                  class="search-field"
-                  placeholder="Поиск товаров..."
-                  aria-label="Поиск"
-                  autocomplete="off"
-                  value="{{ request.GET.search }}"
-                >
-                <button type="submit">Найти</button>
+      <div class="header-center">
+        <form method="GET" action="{% url 'catalog' %}" class="search-form" id="search-form">
+          <input
+            id="search-input"
+            type="text"
+            name="search"
+            class="search-field"
+            placeholder="Поиск товаров..."
+            aria-label="Поиск"
+            autocomplete="off"
+            value="{{ request.GET.search }}"
+          >
+          <button type="submit">Найти</button>
 
-                <div id="search-suggest" class="suggest-box" style="display:none;"></div>
-              </form>
-            </div>
+          <div id="search-suggest" class="suggest-box" style="display:none;"></div>
+        </form>
+      </div>
 
+      <div class="header-right">
+        {% if user.is_authenticated %}
+          <!-- Аватар в шапке -->
+          <a href="{% url 'profile' %}" class="header-avatar" title="Профиль">
+            {% if user.profile.avatar %}
+              <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="header-avatar-img js-avatar-img">
+            {% else %}
+              <div class="header-avatar-placeholder js-avatar-placeholder">👤</div>
+            {% endif %}
+          </a>
 
-            <div class="header-right">
-                {% if user.is_authenticated %}
-                        <!-- Аватар в шапке -->
-                    <a href="{% url 'profile' %}" class="header-avatar" title="Профиль">
-                      {% if user.profile.avatar %}
-                        <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="header-avatar-img js-avatar-img">
-                      {% else %}
-                        <div class="header-avatar-placeholder js-avatar-placeholder">👤</div>
-                      {% endif %}
-                    </a>
-
-                    <a href="{% url 'profile' %}" class="user-greeting" title="Перейти в личный кабинет">
-                        Привет, {{ user|display_name:10 }}!
-                    </a>
-                {% else %}
-                    {% if request.path != '/login/' %}
-                        <a href="{% url 'login' %}" class="register-btn">Вход</a>
-                    {% endif %}
-                {% endif %}
-                {% if user.is_authenticated %}
-                  <a href="{% url 'profile' %}#favorites" class="register-btn" style="padding:5px 10px;">❤</a>
-                {% else %}
-                  <a href="{% url 'login' %}?next={% url 'profile' %}#favorites" class="register-btn" style="padding:5px 10px;">❤</a>
-                {% endif %}
-            </div>
-        </header>
-        <!-- ===================== Контент ===================== -->
-        <main class="main-container">
-            {% block content %}{% endblock %}
-        </main>
-    </div>
-
-    <!-- ===================== Подвал ===================== -->
-    <footer class="footer">
-        <section class="stay-connected">
-            <h2>Оставайтесь на связи</h2>
-            <p>Присоединяйтесь к нам в соцсетях и следите за обновлениями.</p>
-            <nav class="social-icons" aria-label="Соцсети">
-                <a href="#" aria-label="Telegram">✈️</a>
-                <a href="#" aria-label="Instagram">📷</a>
-                <a href="#" aria-label="VK">🖖</a>
-            </nav>
-        </section>
-
-        <p>&copy; <span id="year"></span> Call of Style.</p>
-        <nav aria-label="Юридические ссылки">
-            <a href="#">Политика конфиденциальности</a> |
-            <a href="#">Пользовательское соглашение</a>
-        </nav>
-        <address>Контакты: <a href="mailto:info@CallofStyle.ru">info@CallofStyle.ru</a></address>
-
-        <div class="support-links">
-          {% if user.is_authenticated and user.is_staff %}
-            <a href="{% url 'support_admin_inbox' %}">🛠️ Техподдержка (админ)</a>
-          {% else %}
-            <a href="{% url 'support_chat' %}">🛠️ Техподдержка</a>
+          <a href="{% url 'profile' %}" class="user-greeting" title="Перейти в личный кабинет">
+            Привет, {{ user|display_name:10 }}!
+          </a>
+        {% else %}
+          {% if request.path != '/login/' %}
+            <a href="{% url 'login' %}" class="register-btn">Вход</a>
           {% endif %}
-        </div>
-    </footer>
+        {% endif %}
 
-    <!-- Год -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const y = document.getElementById('year');
-            if (y) y.textContent = new Date().getFullYear();
-        });
-    </script>
+        {% if user.is_authenticated %}
+          <a href="{% url 'profile' %}#favorites" class="register-btn" style="padding:5px 10px;">❤</a>
+        {% else %}
+          <a href="{% url 'login' %}?next={% url 'profile' %}#favorites" class="register-btn" style="padding:5px 10px;">❤</a>
+        {% endif %}
+      </div>
+    </header>
 
-    <!-- Боковая панель -->
-    <div id="sidebar" class="sidebar">
-        <div class="sidebar-header">
-            <button id="close-sidebar" class="close-btn">×</button>
-                <div id="sidebar-avatar-box" class="sidebar-avatar">
-                    {% if user.is_authenticated %}
-                      {% if user.profile.avatar %}
-                        <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="sidebar-avatar-img js-avatar-img">
-                      {% else %}
-                        <div class="sidebar-avatar-placeholder js-avatar-placeholder">👤</div>
-                      {% endif %}
-                    {% endif %}
-                  </div>
-            <h3>
-              Привет,
-              {% if user.is_authenticated %}
-                {{ user|display_name:10 }}!
-              {% else %}
-                гость!
-              {% endif %}
-            </h3>
+    <!-- ===================== Контент ===================== -->
+    <main class="page-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
 
-        </div>
+  <!-- ===================== Подвал ===================== -->
+  <footer class="footer">
+    <section class="stay-connected">
+      <h2>Оставайтесь на связи</h2>
+      <p>Присоединяйтесь к нам в соцсетях и следите за обновлениями.</p>
+      <nav class="social-icons" aria-label="Соцсети">
+        <a href="#" aria-label="Telegram">✈️</a>
+        <a href="#" aria-label="Instagram">📷</a>
+        <a href="#" aria-label="VK">🖖</a>
+      </nav>
+    </section>
 
-        <nav class="sidebar-nav">
-            <a href="{% url 'index' %}">Главная</a>
-            <a href="{% url 'profile' %}">Профиль</a>
-            {% if user.is_authenticated %}
-                <a href="{% url 'profile' %}#favorites">Избранное</a>
-            {% else %}
-                <a href="{% url 'login' %}?next={% url 'profile' %}#favorites">Избранное</a>
-            {% endif %}
-            {% if user.is_authenticated %}
-                <form method="POST" action="{% url 'logout' %}">
-                    {% csrf_token %}
-                    <button type="submit" class="sidebar-logout">Выйти</button>
-                </form>
-            {% else %}
-                <a href="{% url 'login' %}">Войти</a>
-            {% endif %}
-        </nav>
+    <p>&copy; <span id="year"></span> Call of Style.</p>
+
+    <nav aria-label="Юридические ссылки">
+      <a href="#">Политика конфиденциальности</a> |
+      <a href="#">Пользовательское соглашение</a>
+    </nav>
+
+    <address>Контакты: <a href="mailto:info@CallofStyle.ru">info@CallofStyle.ru</a></address>
+
+    <div class="support-links">
+      {% if user.is_authenticated and user.is_staff %}
+        <a href="{% url 'support_admin_inbox' %}">🛠️ Техподдержка (админ)</a>
+      {% else %}
+        <a href="{% url 'support_chat' %}">🛠️ Техподдержка</a>
+      {% endif %}
+    </div>
+  </footer>
+
+  <!-- Год -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const y = document.getElementById('year');
+      if (y) y.textContent = new Date().getFullYear();
+    });
+  </script>
+
+  <!-- Боковая панель -->
+  <div id="sidebar" class="sidebar">
+    <div class="sidebar-header">
+      <button id="close-sidebar" class="close-btn">×</button>
+
+      <div id="sidebar-avatar-box" class="sidebar-avatar">
+        {% if user.is_authenticated %}
+          {% if user.profile.avatar %}
+            <img src="{{ user.profile.avatar.url }}" alt="Аватар" class="sidebar-avatar-img js-avatar-img">
+          {% else %}
+            <div class="sidebar-avatar-placeholder js-avatar-placeholder">👤</div>
+          {% endif %}
+        {% endif %}
+      </div>
+
+      <h3>
+        Привет,
+        {% if user.is_authenticated %}
+          {{ user|display_name:10 }}!
+        {% else %}
+          гость!
+        {% endif %}
+      </h3>
     </div>
 
-    <!-- Overlay для закрытия -->
-    <div id="overlay" class="overlay"></div>
+    <nav class="sidebar-nav">
+      <a href="{% url 'index' %}">Главная</a>
+      <a href="{% url 'profile' %}">Профиль</a>
 
-    <!-- Логика сайдбара (как было, только внутри DOMContentLoaded) -->
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const menuBtn = document.querySelector('.menu-btn');
-            const sidebar = document.getElementById('sidebar');
-            const overlay = document.getElementById('overlay');
-            const closeBtn = document.getElementById('close-sidebar');
+      {% if user.is_authenticated %}
+        <a href="{% url 'profile' %}#favorites">Избранное</a>
+      {% else %}
+        <a href="{% url 'login' %}?next={% url 'profile' %}#favorites">Избранное</a>
+      {% endif %}
 
-            if (menuBtn && sidebar && overlay) {
-                function openMenu() {
-                    sidebar.classList.add('open');
-                    overlay.classList.add('active');
-                    document.body.style.overflow = 'hidden';
-                }
+      {% if user.is_authenticated %}
+        <form method="POST" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="sidebar-logout">Выйти</button>
+        </form>
+      {% else %}
+        <a href="{% url 'login' %}">Войти</a>
+      {% endif %}
+    </nav>
+  </div>
 
-                function closeMenu() {
-                    sidebar.classList.remove('open');
-                    overlay.classList.remove('active');
-                    document.body.style.overflow = '';
-                }
+  <!-- Overlay для закрытия -->
+  <div id="overlay" class="overlay"></div>
 
-                menuBtn.addEventListener('click', openMenu);
-                if (closeBtn) closeBtn.addEventListener('click', closeMenu);
-                overlay.addEventListener('click', closeMenu);
+  <!-- Логика сайдбара -->
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      const menuBtn = document.querySelector('.menu-btn');
+      const sidebar = document.getElementById('sidebar');
+      const overlay = document.getElementById('overlay');
+      const closeBtn = document.getElementById('close-sidebar');
 
-                document.addEventListener('keydown', function (e) {
-                    if (e.key === 'Escape') closeMenu();
-                });
-            }
+      if (menuBtn && sidebar && overlay) {
+        function openMenu() {
+          sidebar.classList.add('open');
+          overlay.classList.add('active');
+          document.body.classList.add('no-scroll');
+        }
+
+        function closeMenu() {
+          sidebar.classList.remove('open');
+          overlay.classList.remove('active');
+          document.body.classList.remove('no-scroll');
+        }
+
+        menuBtn.addEventListener('click', openMenu);
+        if (closeBtn) closeBtn.addEventListener('click', closeMenu);
+        overlay.addEventListener('click', closeMenu);
+
+        document.addEventListener('keydown', function (e) {
+          if (e.key === 'Escape') closeMenu();
         });
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+      }
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

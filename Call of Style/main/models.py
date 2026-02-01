@@ -367,6 +367,7 @@ class Message(models.Model):
     """
     chat = models.ForeignKey(Chat, on_delete=models.CASCADE, related_name='messages', verbose_name='Чат')
     sender = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='sent_messages', verbose_name='Отправитель')
+    image = models.ImageField(upload_to="support_chat/%Y/%m/", blank=True, null=True)
     text = models.TextField(verbose_name='Текст')
     is_read = models.BooleanField(default=False, verbose_name='Прочитано')
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создано')

@@ -786,45 +786,62 @@ def api_support_chat_messages(request, chat_id: int):
             "text": m.text,
             "created_at": m.created_at.strftime("%d.%m %H:%M"),
             "is_mine": (m.sender_id == request.user.id),
+            "image_url": (m.image.url if getattr(m, "image", None) else ""),
         })
 
     return JsonResponse({
         "ok": True,
         "chat_id": chat.id,
-        "status": chat.status,
-        "assigned_to": (
-            (chat.assigned_to.first_name or chat.assigned_to.email) if getattr(chat, "assigned_to", None) else ""
-        ),
+        "chat": {
+            "status": chat.status,
+            "status_label": chat.get_status_display(),
+            "assigned_to_name": (
+                (chat.assigned_to.first_name or chat.assigned_to.email)
+                if getattr(chat, "assigned_to", None) else ""
+            ),
+        },
+
         "messages": items,
         "last_id": items[-1]["id"] if items else last_id,
     })
-
-
 @login_required
 @require_POST
 def api_support_chat_send(request, chat_id: int):
-    """
-    Отправка сообщения в чат (JSON).
-    POST /api/support/chat/<chat_id>/send/
-    body: {"text": "..." }
-    """
     chat = get_object_or_404(Chat, id=chat_id, chat_type="support", user=request.user)
 
     if chat.status == "closed":
         return JsonResponse({"ok": False, "message": "Чат закрыт"}, status=400)
 
-    try:
-        data = json.loads(request.body.decode("utf-8") or "{}")
-    except Exception:
-        data = {}
+    ct = (request.content_type or "")
+    text = ""
+    image = None
 
-    text = (data.get("text") or "").strip()
-    if not text:
-        return JsonResponse({"ok": False, "message": "Пустое сообщение"}, status=400)
+    # JSON (только текст)
+    if "application/json" in ct:
+        try:
+            data = json.loads(request.body.decode("utf-8") or "{}")
+        except Exception:
+            data = {}
+        text = (data.get("text") or "").strip()
+    else:
+        # FormData / обычная форма
+        text = (request.POST.get("text") or request.POST.get("message") or "").strip()
+        image = request.FILES.get("image")
 
-    msg = Message.objects.create(chat=chat, sender=request.user, text=text)
+    if not text and not image:
+        return JsonResponse({"ok": False, "message": "Нужно сообщение или изображение"}, status=400)
 
-    # обновим метки чата
+    # валидация файла
+    if image:
+        if image.size > 8 * 1024 * 1024:
+            return JsonResponse({"ok": False, "message": "Файл слишком большой (макс 8MB)"}, status=400)
+
+        allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+        if getattr(image, "content_type", "") not in allowed:
+            return JsonResponse({"ok": False, "message": "Разрешены только изображения (jpg/png/webp/gif)"}, status=400)
+
+    msg = Message.objects.create(chat=chat, sender=request.user, text=text, image=image)
+
     chat.last_message_at = timezone.now()
     if chat.status == "waiting":
         chat.status = "open"
@@ -837,8 +854,10 @@ def api_support_chat_send(request, chat_id: int):
             "text": msg.text,
             "created_at": msg.created_at.strftime("%d.%m %H:%M"),
             "is_mine": True,
+            "image_url": (msg.image.url if msg.image else ""),
         }
     })
+
 
 def is_support_user(user):
     return user.is_authenticated and (user.is_superuser or user.is_staff)
@@ -958,19 +977,18 @@ def support_admin_release_chat(request, chat_id: int):
 
 @login_required
 @require_POST
-def support_admin_reopen_chat(request, chat_id: int):
+def api_support_admin_reopen(request, chat_id: int):
     if not is_support_user(request.user):
-        return HttpResponseForbidden("Нет доступа")
+        return JsonResponse({"ok": False}, status=403)
 
     chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
 
-    # отвечать/открывать может назначенный или суперюзер
     if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
-        return HttpResponseForbidden("Чат ведёт другой оператор")
+        return JsonResponse({"ok": False, "message": "assigned to another operator"}, status=403)
 
     chat.status = "open"
     chat.save(update_fields=["status"])
-    return redirect("support_admin_chat", chat_id=chat.id)
+    return JsonResponse({"ok": True, "status": "open"})
 
 @login_required
 @require_POST
@@ -988,6 +1006,7 @@ def _msg_to_dict(m: Message, me_id: int):
     return {
         "id": m.id,
         "text": m.text,
+        "image_url": (m.image.url if getattr(m, "image", None) else ""),
         "created_at": m.created_at.strftime("%d.%m %H:%M"),
         "sender_id": m.sender_id,
         "is_me": (m.sender_id == me_id),
@@ -1127,10 +1146,6 @@ def api_support_admin_send(request, chat_id: int):
     if not is_support_user(request.user):
         return JsonResponse({"ok": False, "message": "forbidden"}, status=403)
 
-    text = (request.POST.get("message") or "").strip()
-    if not text:
-        return JsonResponse({"ok": False, "message": "empty"}, status=400)
-
     chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
     if chat.status == "closed":
         return JsonResponse({"ok": False, "message": "chat closed"}, status=403)
@@ -1139,14 +1154,29 @@ def api_support_admin_send(request, chat_id: int):
     if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
         return JsonResponse({"ok": False, "message": "assigned to another operator"}, status=403)
 
-    m = Message.objects.create(chat=chat, sender=request.user, text=text)
+    text = (request.POST.get("message") or "").strip()
+    image = request.FILES.get("image")
+
+    if not text and not image:
+        return JsonResponse({"ok": False, "message": "empty"}, status=400)
+
+    # валидация файла
+    if image:
+        if image.size > 8 * 1024 * 1024:
+            return JsonResponse({"ok": False, "message": "Файл слишком большой (макс 8MB)"}, status=400)
+
+        allowed = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+        if getattr(image, "content_type", "") not in allowed:
+            return JsonResponse({"ok": False, "message": "Только изображения (jpg/png/webp/gif)"}, status=400)
+
+    m = Message.objects.create(chat=chat, sender=request.user, text=text, image=image)
+
     chat.last_message_at = timezone.now()
     if chat.status == "open":
         chat.status = "waiting"
     chat.save(update_fields=["last_message_at", "status"])
 
     return JsonResponse({"ok": True, "message": _msg_to_dict(m, request.user.id)})
-
 
 # ---------------------------
 # ADMIN: take/release/close (AJAX)

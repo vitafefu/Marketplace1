@@ -3,13 +3,23 @@
 
 {% block content %}
 <div class="container" style="max-width:1000px" id="admin-inbox-root" data-tab="{{ tab }}">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:20px 0">
+    <h1 style="margin:0">🛠️ Техподдержка</h1>
+    <a class="btn btn-sm btn-outline-dark" href="{% url 'index' %}">На главную</a>
+  </div>
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap" id="inbox-tabs">
+    <a class="btn btn-sm {% if tab == 'open' %}btn-dark{% else %}btn-outline-dark{% endif %}"
+       href="?tab=open" data-tab="open">Открытые</a>
 
-  <h1 style="margin:20px 0">🛠️ Техподдержка</h1>
+    <a class="btn btn-sm {% if tab == 'mine' %}btn-dark{% else %}btn-outline-dark{% endif %}"
+       href="?tab=mine" data-tab="mine">Мои</a>
 
-  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
-    <a class="btn btn-sm {% if tab == 'open' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?tab=open">Открытые</a>
-    <a class="btn btn-sm {% if tab == 'mine' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?tab=mine">Мои</a>
-    <a class="btn btn-sm {% if tab == 'closed' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?tab=closed">Закрытые</a>
+    <a class="btn btn-sm {% if tab == 'closed' %}btn-dark{% else %}btn-outline-dark{% endif %}"
+       href="?tab=closed" data-tab="closed">Закрытые</a>
+  </div>
+
+  <div id="inbox-empty" class="alert alert-secondary" style="display:none">
+    Чатов пока нет.
   </div>
 
   <div id="inbox-list" class="list-group">
@@ -17,18 +27,21 @@
       {% for c in chats %}
         <a class="list-group-item list-group-item-action"
            data-chat-id="{{ c.id }}"
+           data-unread="{{ c.unread_count|default:0 }}"
            href="{% url 'support_admin_chat' c.id %}">
           <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
             <div style="min-width:0">
               <div style="font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                 <span>#{{ c.id }} — {{ c.user.first_name|default:c.user.email }}</span>
+
                 {% if c.product %}
                   <span style="color:#666">• {{ c.product.title }}</span>
                 {% endif %}
+
                 {% if c.unread_count %}
-                  <span class="badge bg-danger" data-unread>{{ c.unread_count }}</span>
+                  <span class="badge bg-danger" data-unread-badge>{{ c.unread_count }}</span>
                 {% else %}
-                  <span class="badge bg-danger" data-unread style="display:none">0</span>
+                  <span class="badge bg-danger" data-unread-badge style="display:none">0</span>
                 {% endif %}
               </div>
 
@@ -51,8 +64,6 @@
           </div>
         </a>
       {% endfor %}
-    {% else %}
-      <div class="alert alert-secondary">Чатов пока нет.</div>
     {% endif %}
   </div>
 
@@ -62,10 +73,13 @@
 (function () {
   const root = document.getElementById('admin-inbox-root');
   const list = document.getElementById('inbox-list');
-  if (!root || !list) return;
+  const emptyBox = document.getElementById('inbox-empty');
+  const tabsWrap = document.getElementById('inbox-tabs');
+  if (!root || !list || !emptyBox || !tabsWrap) return;
 
   let tab = (root.dataset.tab || 'open').trim();
   let polling = true;
+  let timer = null;
 
   function esc(s) {
     return (s || '').replace(/[&<>"']/g, c => ({
@@ -73,25 +87,40 @@
     }[c]));
   }
 
+  function setActiveTabUI(nextTab) {
+    tabsWrap.querySelectorAll('a[data-tab]').forEach(a => {
+      const t = a.getAttribute('data-tab');
+      if (t === nextTab) {
+        a.classList.remove('btn-outline-dark');
+        a.classList.add('btn-dark');
+      } else {
+        a.classList.remove('btn-dark');
+        a.classList.add('btn-outline-dark');
+      }
+    });
+  }
+
   function chatRowHtml(c) {
     const product = c.product ? `<span style="color:#666">• ${esc(c.product)}</span>` : '';
-    const unread = (c.unread_count && c.unread_count > 0)
-      ? `<span class="badge bg-danger" data-unread>${c.unread_count}</span>`
-      : `<span class="badge bg-danger" data-unread style="display:none">0</span>`;
+    const unread = Number(c.unread_count || 0);
+    const unreadHtml = unread > 0
+      ? `<span class="badge bg-danger" data-unread-badge>${unread}</span>`
+      : `<span class="badge bg-danger" data-unread-badge style="display:none">0</span>`;
 
     return `
       <a class="list-group-item list-group-item-action"
          data-chat-id="${c.id}"
+         data-unread="${unread}"
          href="/support/admin/chat/${c.id}/">
         <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
           <div style="min-width:0">
             <div style="font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
               <span>#${c.id} — ${esc(c.user)}</span>
               ${product}
-              ${unread}
+              ${unreadHtml}
             </div>
             <div style="color:#666;font-size:.9rem">
-              Статус: <span data-status>${esc(c.status_label)}</span>
+              Статус: <span data-status>${esc(c.status_label || '')}</span>
               • Оператор:
               <span data-assigned>${esc(c.assigned_to || 'Не назначен')}</span>
             </div>
@@ -107,85 +136,131 @@
     let node = list.querySelector(`[data-chat-id="${id}"]`);
 
     if (!node) {
-      // новый чат — добавим сверху
       list.insertAdjacentHTML('afterbegin', chatRowHtml(c));
       return;
     }
 
-    // обновляем поля точечно, чтобы не ломать фокус/скролл
-    const unreadEl = node.querySelector('[data-unread]');
     const statusEl = node.querySelector('[data-status]');
     const assignedEl = node.querySelector('[data-assigned]');
     const lastEl = node.querySelector('[data-last]');
+    const badgeEl = node.querySelector('[data-unread-badge]');
 
     if (statusEl) statusEl.textContent = c.status_label || '';
     if (assignedEl) assignedEl.textContent = c.assigned_to || 'Не назначен';
     if (lastEl) lastEl.textContent = c.last_message_at || '—';
 
-    if (unreadEl) {
-      const n = Number(c.unread_count || 0);
-      if (n > 0) {
-        unreadEl.style.display = '';
-        unreadEl.textContent = n;
+    const prevUnread = Number(node.dataset.unread || 0);
+    const nextUnread = Number(c.unread_count || 0);
+    node.dataset.unread = String(nextUnread);
+
+    if (badgeEl) {
+      if (nextUnread > 0) {
+        badgeEl.style.display = '';
+        badgeEl.textContent = String(nextUnread);
       } else {
-        unreadEl.style.display = 'none';
-        unreadEl.textContent = '0';
+        badgeEl.style.display = 'none';
+        badgeEl.textContent = '0';
       }
     }
 
-    // если чат стал “свежее”, поднимем вверх (по last_message_at API уже отсортирован)
-    // проще: пересобрать порядок как у API — но без “мигания”:
-    // тут лайтово: если unread вырос — поднимем
-    if (Number(c.unread_count || 0) > 0) {
-      list.prepend(node);
-    }
+    if (nextUnread > prevUnread) list.prepend(node);
   }
 
-  async function poll() {
+  async function pollOnce() {
     if (!polling) return;
+
     try {
       const r = await fetch(`/api/support/admin/inbox/?tab=${encodeURIComponent(tab)}`, {
         headers: {'X-Requested-With': 'XMLHttpRequest'}
       });
       if (!r.ok) return;
+
       const data = await r.json();
       if (!data.ok) return;
 
       const chats = Array.isArray(data.chats) ? data.chats : [];
-      // если пусто — покажем сообщение
+
       if (!chats.length) {
-        list.innerHTML = `<div class="alert alert-secondary">Чатов пока нет.</div>`;
-        return;
+        emptyBox.style.display = '';
+      } else {
+        emptyBox.style.display = 'none';
+
+        for (const c of chats) upsertRow(c);
+
+        const ids = new Set(chats.map(x => String(x.id)));
+        list.querySelectorAll('[data-chat-id]').forEach(n => {
+          const id = String(n.getAttribute('data-chat-id'));
+          if (!ids.has(id)) n.remove();
+        });
       }
-
-      // если там был alert — очистим
-      if (list.querySelector('.alert')) list.innerHTML = '';
-
-      // обновляем/добавляем
-      for (const c of chats) upsertRow(c);
-
-      // опционально: удалить чаты, которых больше нет в текущем табе
-      const ids = new Set(chats.map(x => String(x.id)));
-      list.querySelectorAll('[data-chat-id]').forEach(n => {
-        if (!ids.has(String(n.getAttribute('data-chat-id')))) n.remove();
-      });
-
-    } catch (e) {
-      // молча
-    } finally {
-      hint && (hint.style.display = 'none');
-    }
+    } catch (e) {}
   }
 
-  // чтобы не жечь ресурсы в фоне
+  function startPolling() {
+    stopPolling();
+    pollOnce();
+    timer = setInterval(pollOnce, 2000);
+  }
+
+  function stopPolling() {
+    if (timer) clearInterval(timer);
+    timer = null;
+  }
+
+  function switchTab(nextTab, pushHistory = true) {
+    nextTab = (nextTab || '').trim();
+    if (!nextTab) return;
+    if (nextTab === tab) return;
+
+    tab = nextTab;
+    root.dataset.tab = tab;
+    setActiveTabUI(tab);
+
+    // URL обновим без перезагрузки
+    const url = new URL(window.location.href);
+    url.searchParams.set('tab', tab);
+    if (pushHistory) history.pushState({tab}, '', url.toString());
+    else history.replaceState({tab}, '', url.toString());
+
+    // ВАЖНО: не пересобираем DOM, просто удаляем текущие строки (они и так будут на месте без мигания)
+    // Если хочешь вообще без "пустоты" — можно оставить и ждать poll.
+    // Я делаю мягко: очищаю только строки чатов, placeholder контролим отдельно.
+    list.querySelectorAll('[data-chat-id]').forEach(n => n.remove());
+    emptyBox.style.display = 'none';
+
+    startPolling();
+  }
+
+  // клики по табам без reload
+  tabsWrap.addEventListener('click', (e) => {
+    const a = e.target.closest('a[data-tab]');
+    if (!a) return;
+
+    e.preventDefault();
+    switchTab(a.getAttribute('data-tab'), true);
+  });
+
+  // back/forward
+  window.addEventListener('popstate', (e) => {
+    const st = e.state || {};
+    const url = new URL(window.location.href);
+    const urlTab = (st.tab || url.searchParams.get('tab') || 'open').trim();
+    switchTab(urlTab, false);
+  });
+
+  // фон — не жжем
   document.addEventListener('visibilitychange', () => {
     polling = !document.hidden;
   });
 
-  // каждые 2 секунды
-  poll();
-  const timer = setInterval(poll, 2000);
-  window.addEventListener('beforeunload', () => clearInterval(timer));
+  // init
+  setActiveTabUI(tab);
+  const initialAny = list.querySelector('[data-chat-id]');
+  emptyBox.style.display = initialAny ? 'none' : '';
+  history.replaceState({tab}, '', window.location.href);
+  startPolling();
+
+  window.addEventListener('beforeunload', () => stopPolling());
 })();
 </script>
 

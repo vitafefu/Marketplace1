@@ -19,20 +19,20 @@
         <div style="margin-top:4px">
           Собеседник: <b>Оператор</b>
           {% if chat.assigned_to %}
-            • Назначен: <b>{{ chat.assigned_to.first_name|default:chat.assigned_to.email }}</b>
+            Назначен: <b id="chat-assigned-label">{{ chat.assigned_to.first_name|default:chat.assigned_to.email }}</b>
           {% else %}
-            • <b>Ожидайте, вам ответят</b>
+            • <b id="chat-assigned-label">Ожидайте, вам ответят</b>
           {% endif %}
         </div>
 
         <div style="margin-top:4px">
-          Статус: <b>{{ chat.get_status_display }}</b>
+          Статус: <b id="chat-status-label">{{ chat.get_status_display }}</b>
         </div>
       </div>
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-      <a class="btn btn-sm btn-outline-dark" href="{% url 'profile' %}">← В профиль</a>
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'index' %}">На главную</a>
     </div>
   </div>
 
@@ -40,6 +40,7 @@
        class="chat-messages"
        style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;max-height:60vh;overflow:auto" >
     {% for message in messages %}
+
       <div style="margin:10px 0;display:flex;{% if message.sender_id == user.id %}justify-content:flex-end{% else %}justify-content:flex-start{% endif %}">
         <div data-mid="{{ message.id }}" style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
           <div style="font-size:.85rem;color:#666;margin-bottom:6px">
@@ -50,6 +51,13 @@
             {% endif %}
             • {{ message.created_at|date:"d.m H:i" }}
           </div>
+            {% if message.image %}
+              <div style="margin-bottom:8px">
+                <a href="{{ message.image.url }}" target="_blank">
+                  <img src="{{ message.image.url }}" style="max-width:260px;max-height:260px;border-radius:10px;display:block">
+                </a>
+              </div>
+            {% endif %}
           <div style="white-space:pre-wrap">{{ message.text }}</div>
         </div>
       </div>
@@ -62,9 +70,16 @@
     {% if chat.status == 'closed' %}
       <div class="alert alert-warning">Чат закрыт.</div>
     {% else %}
+      <div id="chat-preview" style="margin-top:10px;display:none;align-items:center;gap:10px">
+        <img id="chat-preview-img" style="max-width:180px;max-height:180px;border-radius:10px;border:1px solid #eee;display:block">
+        <button type="button" id="chat-preview-clear" class="btn btn-sm btn-outline-dark">Убрать</button>
+      </div>
       <form id="chat-form" autocomplete="off" style="display:flex;gap:10px">
         {% csrf_token %}
-        <input id="chat-input" class="form-control" type="text" name="message" placeholder="Введите сообщение..." required autocomplete="off">
+        <input id="chat-input" class="form-control" type="text" name="message" placeholder="Введите сообщение..." autocomplete="off">
+        <input id="chat-file" type="file" accept="image/*" hidden>
+        <button type="button" id="chat-file-btn" class="btn btn-outline-secondary" title="Прикрепить изображение" style="font-size:20px;padding:6px 10px">Файл</button>
+
         <button class="btn btn-dark" type="submit">Отправить</button>
       </form>
       <div id="chat-error" style="display:none;margin-top:10px" class="alert alert-danger"></div>
@@ -90,6 +105,18 @@
   function renderMessage(m) {
     const side = m.is_mine ? 'flex-end' : 'flex-start';
     const who = m.is_mine ? 'Вы' : 'Оператор';
+
+    const imgHtml = m.image_url
+      ? `<div style="margin-bottom:8px">
+           <a href="${escapeHtml(m.image_url)}" target="_blank">
+             <img src="${escapeHtml(m.image_url)}"
+                  style="max-width:260px;max-height:260px;border-radius:10px;display:block">
+           </a>
+         </div>`
+      : '';
+
+    const textHtml = m.text ? `<div style="white-space:pre-wrap">${escapeHtml(m.text)}</div>` : '';
+
     return `
       <div style="margin:10px 0;display:flex;justify-content:${side}">
         <div data-mid="${m.id}"
@@ -97,11 +124,11 @@
           <div style="font-size:.85rem;color:#666;margin-bottom:6px">
             ${who} • ${escapeHtml(m.created_at)}
           </div>
-          <div style="white-space:pre-wrap">${escapeHtml(m.text)}</div>
+          ${imgHtml}
+          ${textHtml}
         </div>
       </div>
     `;
-
   }
 
   document.addEventListener('DOMContentLoaded', function () {
@@ -112,12 +139,29 @@
     const input = document.getElementById('chat-input');
     const errBox = document.getElementById('chat-error');
 
-    if (box) box.scrollTop = box.scrollHeight;
+    const statusEl = document.getElementById('chat-status-label');
+    const assignedEl = document.getElementById('chat-assigned-label');
+    const lockedEl = document.getElementById('chat-locked');
 
-    let lastId = 0;
-    // попробуем вычислить lastId из уже отрендеренных сообщений (если нужно — просто оставим 0)
-    // (самый надежный вариант — хранить lastId в data-атрибуте, но это ок и так)
-    // lastId будет обновляться ответом API.
+    const fileInput = document.getElementById('chat-file');
+    const preview = document.getElementById('chat-preview');
+    const previewImg = document.getElementById('chat-preview-img');
+    const previewClear = document.getElementById('chat-preview-clear');
+    const fileBtn = document.getElementById('chat-file-btn');
+
+    if (fileBtn && fileInput) {
+      fileBtn.addEventListener('click', () => {
+        fileInput.click();
+      });
+    }
+
+    if (!box || !chatId) return;
+
+    let lastId = (function () {
+      const nodes = box.querySelectorAll('[data-mid]');
+      if (!nodes.length) return 0;
+      return Number(nodes[nodes.length - 1].getAttribute('data-mid')) || 0;
+    })();
 
     let polling = true;
 
@@ -128,8 +172,82 @@
       setTimeout(() => { errBox.style.display = 'none'; }, 2500);
     }
 
+    // ждём ответят / назначение / статус — из data.status и data.assigned_to (как у тебя в API)
+    function applyChatState(data) {
+      if (!data) return;
+
+      if (statusEl && typeof data.status !== 'undefined') {
+        const map = { open: 'Открыт', waiting: 'Ожидание', closed: 'Закрыт' };
+        statusEl.textContent = map[data.status] || data.status;
+      }
+
+      if (assignedEl && typeof data.assigned_to !== 'undefined') {
+        assignedEl.textContent = data.assigned_to || 'Ожидайте, вам ответят';
+      }
+
+      const isClosed = (data.status === 'closed');
+
+      if (isClosed) {
+        if (lockedEl) {
+          lockedEl.style.display = 'block';
+          lockedEl.textContent = 'Чат закрыт.';
+        }
+        if (form) form.style.display = 'none';
+      } else {
+        if (lockedEl) lockedEl.style.display = 'none';
+        if (form) form.style.display = 'flex';
+      }
+    }
+
+    // ===== автоскролл “как телега” =====
+    let firstSync = true;
+    let stickToBottom = true;
+
+    function gapToBottom() {
+      return box.scrollHeight - box.scrollTop - box.clientHeight;
+    }
+
+    function updateStick() {
+      stickToBottom = gapToBottom() < 140;
+    }
+
+    function scrollToBottom() {
+      requestAnimationFrame(() => {
+        box.scrollTop = box.scrollHeight;
+        requestAnimationFrame(() => {
+          box.scrollTop = box.scrollHeight;
+        });
+      });
+    }
+
+    box.addEventListener('scroll', updateStick);
+
+    // при открытии
+    scrollToBottom();
+    setTimeout(scrollToBottom, 50);
+    window.addEventListener('load', scrollToBottom);
+
+    // ===== preview =====
+    if (fileInput && preview && previewImg) {
+      fileInput.addEventListener('change', () => {
+        const f = fileInput.files?.[0];
+        if (!f) { preview.style.display = 'none'; return; }
+        previewImg.src = URL.createObjectURL(f);
+        preview.style.display = 'flex';
+      });
+    }
+
+    if (previewClear && fileInput && preview) {
+      previewClear.addEventListener('click', () => {
+        fileInput.value = '';
+        preview.style.display = 'none';
+      });
+    }
+
     async function fetchNew() {
-      if (!chatId || !polling) return;
+      if (!polling) return;
+
+      const shouldScroll = firstSync || stickToBottom;
 
       try {
         const r = await fetch(`/api/support/chat/${chatId}/messages/?last_id=${lastId}`, {
@@ -138,37 +256,38 @@
         const data = await r.json();
         if (!data.ok) return;
 
-        if (Array.isArray(data.messages) && data.messages.length) {
-          const atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+        applyChatState(data);
 
+        if (Array.isArray(data.messages) && data.messages.length) {
           for (const m of data.messages) {
             box.insertAdjacentHTML('beforeend', renderMessage(m));
           }
           lastId = data.last_id || lastId;
 
-          if (atBottom) box.scrollTop = box.scrollHeight;
+          scrollToBottom();
+          requestAnimationFrame(updateStick);
         }
-      } catch (e) {
-        // молча, чтобы не спамить
-      }
+
+        firstSync = false;
+      } catch (e) {}
     }
 
-    async function sendMessage(text) {
-      const csrftoken = getCookie('csrftoken');
+    async function sendMessage(text, file) {
+      const fd = new FormData();
+      fd.append('text', text || '');
+      if (file) fd.append('image', file);
+
       const r = await fetch(`/api/support/chat/${chatId}/send/`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-CSRFToken': csrftoken,
+          'X-CSRFToken': getCookie('csrftoken'),
           'X-Requested-With': 'XMLHttpRequest'
         },
-        body: JSON.stringify({ text })
+        body: fd
       });
 
       const data = await r.json();
-      if (!data.ok) {
-        throw new Error(data.message || 'Ошибка отправки');
-      }
+      if (!data.ok) throw new Error(data.message || 'Ошибка отправки');
       return data.message;
     }
 
@@ -177,43 +296,43 @@
         e.preventDefault();
 
         const text = (input.value || '').trim();
-        if (!text) return;
+        const file = fileInput?.files?.[0] || null;
+        if (!text && !file) return;
 
         input.disabled = true;
+        if (fileInput) fileInput.disabled = true;
+
         try {
-          const msg = await sendMessage(text);
-          // оптимистично добавим сразу (и lastId обновим)
+          const msg = await sendMessage(text, file);
+
           box.insertAdjacentHTML('beforeend', renderMessage(msg));
           lastId = Math.max(lastId, msg.id || 0);
+
           input.value = '';
-          box.scrollTop = box.scrollHeight;
+          if (fileInput) fileInput.value = '';
+          if (preview) preview.style.display = 'none';
+
+          stickToBottom = true;
+          scrollToBottom();
         } catch (err) {
           showError(err.message);
         } finally {
           input.disabled = false;
+          if (fileInput) fileInput.disabled = false;
           input.focus();
         }
       });
     }
 
-    // polling
+    fetchNew();
     const timer = setInterval(fetchNew, 1500);
 
-    // стопаем polling, если вкладка скрыта (чтобы не жечь ресурсы)
     document.addEventListener('visibilitychange', () => {
       polling = !document.hidden;
     });
 
-    // на уход со страницы
     window.addEventListener('beforeunload', () => clearInterval(timer));
   });
-
-  // убрать “залипание” текста при возврате назад
-  window.addEventListener('pageshow', function (e) {
-    if (e.persisted) {
-      const inp = document.getElementById('chat-input');
-      if (inp) inp.value = '';
-    }
-  });
 </script>
+
 {% endblock %}

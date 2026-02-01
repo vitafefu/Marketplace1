@@ -36,7 +36,7 @@ urlpatterns = [
     path("support/admin/chat/<int:chat_id>/take/", views.support_admin_take_chat, name="support_admin_take_chat"),
     path("support/admin/chat/<int:chat_id>/close/", views.support_admin_close_chat, name="support_admin_close_chat"),
     path("support/admin/chat/<int:chat_id>/release/", views.support_admin_release_chat, name="support_admin_release_chat"),
-    path("support/admin/chat/<int:chat_id>/reopen/", views.support_admin_reopen_chat, name="support_admin_reopen_chat"),
+    path("api/support/admin/chat/<int:chat_id>/reopen/", views.api_support_admin_reopen,name="api_support_admin_reopen"),
 
     # admin inbox ajax
     path("api/support/admin/inbox/", views.api_support_admin_inbox, name="api_support_admin_inbox"),

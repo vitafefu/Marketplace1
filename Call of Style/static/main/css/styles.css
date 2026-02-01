@@ -1852,3 +1852,11 @@ body {
     width: 175px;
   }
 }
+
+.page-content{
+  flex: 1;
+  width: 100%;
+}
+
+/* чтобы сайдбар не ломал прокрутку */
+.no-scroll{ overflow: hidden; }
