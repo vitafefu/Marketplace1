@@ -5,6 +5,7 @@ from django.dispatch import receiver
 from django.db.models.signals import post_save
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.conf import settings
+from django.utils import timezone
 
 class Country(models.Model):
     name = models.CharField(max_length=150, unique=True, verbose_name="Страна")
@@ -314,6 +315,23 @@ class Chat(models.Model):
         ('consultant', 'Консультант'),
     )
 
+    assigned_to = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_support_chats",
+        help_text="Оператор"
+    )
+
+    STATUS_CHOICES = (
+        ("open", "Открыт"),
+        ("waiting", "Ожидание"),
+        ("closed", "Закрыт"),
+    )
+    status = models.CharField(max_length=16, choices=STATUS_CHOICES, default="open")
+
+    last_message_at = models.DateTimeField(null=True, blank=True)
+
     chat_type = models.CharField(max_length=20, choices=CHAT_TYPES, verbose_name='Тип чата')
 
     user = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='chats', verbose_name='Пользователь')
@@ -325,15 +343,6 @@ class Chat(models.Model):
         blank=True,
         related_name='chats',
         verbose_name='Товар'
-    )
-
-    operator = models.ForeignKey(
-        CustomUser,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name='assigned_chats',
-        verbose_name='Оператор'
     )
 
     is_active = models.BooleanField(default=True, verbose_name='Активен')
@@ -351,7 +360,6 @@ class Chat(models.Model):
 
     def __str__(self) -> str:
         return f"Chat({self.chat_type}) #{self.pk}"
-
 
 class Message(models.Model):
     """
@@ -374,3 +382,9 @@ class Message(models.Model):
 
     def __str__(self) -> str:
         return f"Msg #{self.pk} in chat #{self.chat_id}"
+
+@receiver(post_save, sender=Message)
+def bump_chat_last_message(sender, instance: Message, created: bool, **kwargs):
+    if not created:
+        return
+    Chat.objects.filter(pk=instance.chat_id).update(last_message_at=timezone.now())

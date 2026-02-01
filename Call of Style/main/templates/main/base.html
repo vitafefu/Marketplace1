@@ -116,7 +116,11 @@
         <address>Контакты: <a href="mailto:info@CallofStyle.ru">info@CallofStyle.ru</a></address>
 
         <div class="support-links">
-            <a href="{% url 'support_chat' 'support' %}">🛠️ Техподдержка</a>
+          {% if user.is_authenticated and user.is_staff %}
+            <a href="{% url 'support_admin_inbox' %}">🛠️ Техподдержка (админ)</a>
+          {% else %}
+            <a href="{% url 'support_chat' %}">🛠️ Техподдержка</a>
+          {% endif %}
         </div>
     </footer>
 

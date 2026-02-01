@@ -13,9 +13,7 @@
 </section>
 
 <section class="popular-screw">
-  <div class="popular-screw-header">
-    <h2>Популярные товары</h2>
-  </div>
+  <h2 class="section-title">Популярные товары</h2>
 
   <div class="screw-scroll" id="screwScroll">
     <!-- Слой карточек (НЕ создаёт ширину) -->
@@ -29,6 +27,18 @@
 
     <!-- Фейковая ширина (создаёт скролл) -->
     <div class="screw-spacer" id="screwSpacer"></div>
+  </div>
+</section>
+
+<section class="today-picks">
+  <h2 class="section-title">Для вас</h2>
+
+  <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-5 g-3 today-picks">
+    {% for product in today_products %}
+      <div class="col d-flex">
+        {% include "main/_product_card.html" with product=product %}
+      </div>
+    {% endfor %}
   </div>
 </section>
 

@@ -29,7 +29,6 @@
     padding: 0 20px;
 }
 
-
 body {
     font-family: Arial, sans-serif; /* Устанавливает шрифт по умолчанию для всего тела страницы */
     line-height: 1.5; /* Устанавливает межстрочный интервал для текста */
@@ -443,8 +442,9 @@ body {
 /* ===================== Адаптация для мобильных ===================== */
 @media (max-width: 768px) {
     .main-container {
-        max-width: 100%;
-        padding: 0 !important; /* Форсируем удаление отступов */
+    padding-left: 20px !important;
+    padding-right: 20px !important;
+    padding-bottom: 20px !important; /* воздух от футера на мобиле */
     }
 
     .header {
@@ -677,7 +677,6 @@ body {
 
 }
 
-
 .product-brand{
   font-size: 1.1rem;
   color: #777;
@@ -717,11 +716,11 @@ body {
 
 /* Цвета кнопок */
 .product-card-actions .btn-details {
-  background: #333;
+  background: #ff6b6b;
   color: #fff;
 }
 .product-card-actions .btn-details:hover {
-  background: #555;
+  background: #ff6b6b;
 }
 
 .product-card-actions .btn-fav {
@@ -729,7 +728,7 @@ body {
   color: #fff;
 }
 .product-card-actions .btn-fav:hover {
-  background: #ff4c4c;
+  background: #ff6b6b;
 }
 
 /* universal bootstrap columns for product cards */
@@ -802,6 +801,7 @@ body {
     gap: 30px;
     min-height: 600px;
     margin-top: 20px;
+    margin-bottom: 20px;
 }
 
 /* Боковая панель */
@@ -1583,6 +1583,7 @@ body {
   background:#fff;
   border-radius:12px;
   box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  border-bottom: 20px;
 }
 
 /* важно: это реальная ширина/высота “окна” */
@@ -1590,6 +1591,7 @@ body {
   position: relative;
   height: 872px;
   width: 100%;
+  margin-bottom: 10px;
 }
 
 /* stage “приклеен” к окну, чтобы винт был всегда на месте */
@@ -1601,6 +1603,7 @@ body {
   width: 100%;
   perspective: 4200px;           /* камера */
   transform-style: preserve-3d;
+
 }
 .screw-item .product-card{
   width: 230px;
@@ -1621,6 +1624,109 @@ body {
 .screw-spacer{
   height: 1px;
   width: 950px; /* JS перезапишет */
+}
+
+@media (max-width: 768px){
+  .screw-scroll{
+    height: 560px;            /* было 872 */
+    border-radius: 10px;
+  }
+  .screw-viewport,
+  .screw-stage{
+    height: 560px;            /* синхронно */
+  }
+  .screw-item .product-card{
+    width: 170px;             /* было 230 */
+  }
+}
+
+@media (max-width: 420px){
+  .screw-scroll{
+    height: 520px;
+  }
+  .screw-viewport,
+  .screw-stage{
+    height: 520px;
+  }
+  .screw-item .product-card{
+    width: 155px;
+  }
+}
+
+/* ===== Today strip under screw ===== */
+.today-strip{
+  margin-top: 26px;
+  padding: 18px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,.08);
+  border-bottom: 20px;
+
+}
+
+.today-head{
+  display:flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.section-title {
+  margin: 20px 0 20px;     /* снизу */
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+.section-title::after {
+  content: '';
+  display: block;
+  width: 48px;
+  height: 3px;
+  background: #ff6b6b;
+  margin-top: 8px;
+  border-radius: 2px;
+}
+.today-more{
+  text-decoration: none;
+  color: #ff6b6b;
+  font-weight: 700;
+}
+
+.today-grid{
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+}
+
+.today-picks {
+  margin-bottom: 20px;
+}
+
+.today-img img{
+  width: 100%;
+  aspect-ratio: 3/4;
+  object-fit: cover;
+  display:block;
+}
+
+.today-body{
+  padding: 10px;
+  display:flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+
+/* adapt */
+@media (max-width: 1100px){
+  .today-grid{ grid-template-columns: repeat(4, 1fr); }
+}
+@media (max-width: 768px){
+  .today-strip{ padding: 14px; }
+  .today-grid{ grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 360px){
+  .today-grid{ grid-template-columns: 1fr; }
 }
 
 /* ===== LOGIN/REGISTER: нормальная ширина полей ===== */
@@ -1645,3 +1751,104 @@ body {
 #search-suggest { z-index: 99999; }
 .header, .header-center { overflow: visible; }
 
+/* ===== Верхняя панель каталога (всегда сверху) ===== */
+.catalog-filters{
+  width: 100%;
+  background: #fff;
+  padding: 16px;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+}
+
+/* чтобы на мобиле панель не была "уже телефона" */
+@media (max-width: 768px){
+  .catalog-page .container{
+    max-width: 100% !important;
+  }
+  .catalog-filters{
+    border-radius: 12px;
+  }
+}
+
+/* ===== Категории горизонтально "таблетками" ===== */
+.category-list--row{
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap; /* на ПК можно переносить */
+}
+
+.category-list--row li{ margin: 0; }
+
+.category-list--row a{
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #f3f3f3;
+  text-decoration: none;
+  color: #111;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.category-list--row a.active{
+  background: #ff6b6b;
+  color: #fff;
+}
+
+/* на мобиле: одной строкой + горизонтальный скролл */
+@media (max-width: 768px){
+  .category-list--row{
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+  }
+  .category-list--row li{
+    flex: 0 0 auto;
+  }
+}
+
+/* ===== Сортировка блок ===== */
+.sort-block .sort-label{
+  font-size: 0.95rem;
+  color: #444;
+}
+
+.sort-select{
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  background: #fff;
+}
+
+@media (max-width: 768px){
+  .screw-scroll{
+    height: 560px;            /* было 872 */
+    border-radius: 10px;
+  }
+  .screw-viewport,
+  .screw-stage{
+    height: 560px;            /* синхронно */
+  }
+  .screw-item .product-card{
+    width: 170px;             /* было 230 */
+  }
+}
+
+@media (max-width: 420px){
+  .screw-scroll{
+    height: 520px;
+  }
+  .screw-viewport,
+  .screw-stage{
+    height: 520px;
+  }
+  .screw-item .product-card{
+    width: 175px;
+  }
+}

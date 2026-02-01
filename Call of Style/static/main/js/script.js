@@ -1578,6 +1578,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const hasSpaces = (v) => /\s/.test(v || '');
   const normalizeEq = (s) => (s || '').trim().toLowerCase();
 
+  [nameInput, countryInput, cityInput].forEach((el) =>
+    preventLeadingSpace(el, 'Не начинайте с пробела')
+  );
+
   // --- space blockers (как в логине/регистре) ---
   const attachSpaceBlocker = (inputEl, message) => {
     if (!inputEl) return;
@@ -2018,23 +2022,66 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!N) return;
 
   // ====== НАСТРОЙКИ ======
-  const CFG = {
-    radius: 395,        // радиус трубы (влево/вправо)
-    depth: 228,         // глубина (в экран)
-    pitch: 910,         // шаг по вертикали на 1 оборот
-    stepAngle: 0.64,    // расстояние между карточками по витку (больше = дальше)
-    minScale: 0.48,
-    maxScale: 0.97,
-    minOpacity: 0.22,
-    maxOpacity: 1.0,
+  const getCFG = () => {
+      const w = window.innerWidth;
 
-    // “бесконечный скролл”
-    loopFactor: 60,     // чем больше — тем дальше “края” (обычно 40..120)
-    phaseDiv: 808,      // скорость вращения от scrollLeft (меньше => быстрее)
+      // мобила
+      if (w <= 520) {
+        return {
+          radius: 115,
+          depth: 86,
+          pitch: 652,
+          stepAngle: 1.25,
+          minScale: 0.52,
+          maxScale: 1.05,
+          minOpacity: 0.32,
+          maxOpacity: 1.0,
+          loopFactor: 45,
+          phaseDiv: 520,
+          autoSpeed: 0.75,
+          offsetX: 0,
+          offsetY: -164,
+        };
+      }
 
-    // авто-движение
-    autoSpeed: 0.55,    // px per frame (0.3..1.2)
-  };
+      // планшет/узкие
+      if (w <= 800) {
+        return {
+          radius: 240,
+          depth: 160,
+          pitch: 600,
+          stepAngle: 0.64,
+          minScale: 0.52,
+          maxScale: 0.98,
+          minOpacity: 0.22,
+          maxOpacity: 1.0,
+          loopFactor: 50,
+          phaseDiv: 620,
+          autoSpeed: 0.50,
+          offsetX: 0,
+          offsetY: -110,
+        };
+      }
+
+      // десктоп
+      return {
+        radius: 485,
+        depth: 228,
+        pitch: 910,
+        stepAngle: 0.64,
+        minScale: 0.48,
+        maxScale: 0.97,
+        minOpacity: 0.22,
+        maxOpacity: 1.0,
+        loopFactor: 60,
+        phaseDiv: 808,
+        autoSpeed: 0.55,
+        offsetX: 50,
+        offsetY: -150,
+      };
+    };
+
+    let CFG = getCFG();
 
   // один период винта — полный оборот, который содержит N карточек
   const PERIOD = Math.PI * 2;                // 2π
@@ -2105,7 +2152,7 @@ document.addEventListener("DOMContentLoaded", () => {
       el.style.zIndex = String(Math.round(1000 * k));
 
       el.style.transform =
-        `translate3d(${x - cx+50}px, ${y - cy-150}px, ${z}px) translate(-50%, -50%) scale(${scale})`;
+          `translate3d(${x - cx + (CFG.offsetX || 0)}px, ${y - cy + (CFG.offsetY || 0)}px, ${z}px) translate(-50%, -50%) scale(${scale})`;
     });
   };
 
@@ -2142,10 +2189,11 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   window.addEventListener("resize", () => {
-    setSpacer();
-    recenterIfNeeded();
-    render();
-  });
+      CFG = getCFG();
+      setSpacer();
+      recenterIfNeeded();
+      render();
+    });
 
   // init
   setSpacer();
@@ -2157,6 +2205,93 @@ document.addEventListener("DOMContentLoaded", () => {
     render();
     recenterIfNeeded();
     raf = requestAnimationFrame(tick);
+  });
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  const productsBox = document.getElementById("catalog-products");
+  const categoriesWrap = document.getElementById("catalog-categories");
+  const sortSelect = document.getElementById("catalog-sort");
+
+  if (!productsBox) return; // не каталог
+
+  const baseUrl = productsBox.dataset.url || window.location.pathname;
+
+  const setActiveCategory = (href) => {
+    if (!categoriesWrap) return;
+    const links = categoriesWrap.querySelectorAll("a[data-catalog-link]");
+    links.forEach((a) => a.classList.remove("active"));
+
+    // активируем тот, чей href совпадает по search-параметрам
+    const target = Array.from(links).find((a) => a.href === href) ||
+                   Array.from(links).find((a) => new URL(a.href).search === new URL(href).search);
+
+    if (target) target.classList.add("active");
+  };
+
+  const loadCatalog = async (url, { push = true } = {}) => {
+    try {
+      // чтобы Django вернул полноценную страницу, но мы заберём только нужный кусок
+      const res = await fetch(url, {
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+      });
+
+      if (!res.ok) return;
+
+      const html = await res.text();
+      const doc = new DOMParser().parseFromString(html, "text/html");
+
+      const newProducts = doc.getElementById("catalog-products");
+      const newSort = doc.getElementById("catalog-sort");
+
+      if (newProducts) {
+        productsBox.innerHTML = newProducts.innerHTML;
+      }
+
+      // синхронизируем сортировку (если сервер вернул selected)
+      if (sortSelect && newSort) {
+        sortSelect.value = newSort.value;
+      }
+
+      // активная категория
+      setActiveCategory(url);
+
+      // URL в адресной строке
+      if (push) history.pushState({ url }, "", url);
+
+      // если у тебя после подгрузки нужно ре-инициализировать какие-то JS для карточек — делай тут
+      // initFavoritesButtons?.();
+    } catch (e) {
+      console.warn("[CATALOG] load failed", e);
+    }
+  };
+
+  // клики по категориям
+  if (categoriesWrap) {
+    categoriesWrap.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-catalog-link]");
+      if (!a) return;
+
+      e.preventDefault();
+      loadCatalog(a.href, { push: true });
+    });
+  }
+
+  // смена сортировки
+  if (sortSelect) {
+    sortSelect.addEventListener("change", () => {
+      const u = new URL(window.location.href);
+      u.searchParams.set("sort", sortSelect.value);
+
+      // сохраняем категорию/search если есть — URL уже содержит их
+      loadCatalog(u.toString(), { push: true });
+    });
+  }
+
+  // back/forward в браузере
+  window.addEventListener("popstate", (e) => {
+    const url = (e.state && e.state.url) ? e.state.url : window.location.href;
+    loadCatalog(url, { push: false });
   });
 });
 

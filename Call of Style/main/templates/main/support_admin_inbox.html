@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Техподдержка{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1000px" id="admin-inbox-root" data-tab="{{ tab }}">
+
+  <h1 style="margin:20px 0">🛠️ Техподдержка</h1>
+
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap">
+    <a class="btn btn-sm {% if tab == 'open' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?tab=open">Открытые</a>
+    <a class="btn btn-sm {% if tab == 'mine' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?tab=mine">Мои</a>
+    <a class="btn btn-sm {% if tab == 'closed' %}btn-dark{% else %}btn-outline-dark{% endif %}" href="?tab=closed">Закрытые</a>
+  </div>
+
+  <div id="inbox-list" class="list-group">
+    {% if chats %}
+      {% for c in chats %}
+        <a class="list-group-item list-group-item-action"
+           data-chat-id="{{ c.id }}"
+           href="{% url 'support_admin_chat' c.id %}">
+          <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+            <div style="min-width:0">
+              <div style="font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                <span>#{{ c.id }} — {{ c.user.first_name|default:c.user.email }}</span>
+                {% if c.product %}
+                  <span style="color:#666">• {{ c.product.title }}</span>
+                {% endif %}
+                {% if c.unread_count %}
+                  <span class="badge bg-danger" data-unread>{{ c.unread_count }}</span>
+                {% else %}
+                  <span class="badge bg-danger" data-unread style="display:none">0</span>
+                {% endif %}
+              </div>
+
+              <div style="color:#666;font-size:.9rem">
+                Статус: <span data-status>{{ c.get_status_display }}</span>
+                • Оператор:
+                <span data-assigned>
+                  {% if c.assigned_to %}
+                    {{ c.assigned_to.first_name|default:c.assigned_to.email }}
+                  {% else %}
+                    Не назначен
+                  {% endif %}
+                </span>
+              </div>
+            </div>
+
+            <div style="color:#666;font-size:.85rem;white-space:nowrap" data-last>
+              {% if c.last_message_at %}{{ c.last_message_at|date:"d.m H:i" }}{% else %}—{% endif %}
+            </div>
+          </div>
+        </a>
+      {% endfor %}
+    {% else %}
+      <div class="alert alert-secondary">Чатов пока нет.</div>
+    {% endif %}
+  </div>
+
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById('admin-inbox-root');
+  const list = document.getElementById('inbox-list');
+  if (!root || !list) return;
+
+  let tab = (root.dataset.tab || 'open').trim();
+  let polling = true;
+
+  function esc(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function chatRowHtml(c) {
+    const product = c.product ? `<span style="color:#666">• ${esc(c.product)}</span>` : '';
+    const unread = (c.unread_count && c.unread_count > 0)
+      ? `<span class="badge bg-danger" data-unread>${c.unread_count}</span>`
+      : `<span class="badge bg-danger" data-unread style="display:none">0</span>`;
+
+    return `
+      <a class="list-group-item list-group-item-action"
+         data-chat-id="${c.id}"
+         href="/support/admin/chat/${c.id}/">
+        <div style="display:flex;justify-content:space-between;gap:12px;align-items:center">
+          <div style="min-width:0">
+            <div style="font-weight:600;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <span>#${c.id} — ${esc(c.user)}</span>
+              ${product}
+              ${unread}
+            </div>
+            <div style="color:#666;font-size:.9rem">
+              Статус: <span data-status>${esc(c.status_label)}</span>
+              • Оператор:
+              <span data-assigned>${esc(c.assigned_to || 'Не назначен')}</span>
+            </div>
+          </div>
+          <div style="color:#666;font-size:.85rem;white-space:nowrap" data-last>${esc(c.last_message_at || '—')}</div>
+        </div>
+      </a>
+    `;
+  }
+
+  function upsertRow(c) {
+    const id = String(c.id);
+    let node = list.querySelector(`[data-chat-id="${id}"]`);
+
+    if (!node) {
+      // новый чат — добавим сверху
+      list.insertAdjacentHTML('afterbegin', chatRowHtml(c));
+      return;
+    }
+
+    // обновляем поля точечно, чтобы не ломать фокус/скролл
+    const unreadEl = node.querySelector('[data-unread]');
+    const statusEl = node.querySelector('[data-status]');
+    const assignedEl = node.querySelector('[data-assigned]');
+    const lastEl = node.querySelector('[data-last]');
+
+    if (statusEl) statusEl.textContent = c.status_label || '';
+    if (assignedEl) assignedEl.textContent = c.assigned_to || 'Не назначен';
+    if (lastEl) lastEl.textContent = c.last_message_at || '—';
+
+    if (unreadEl) {
+      const n = Number(c.unread_count || 0);
+      if (n > 0) {
+        unreadEl.style.display = '';
+        unreadEl.textContent = n;
+      } else {
+        unreadEl.style.display = 'none';
+        unreadEl.textContent = '0';
+      }
+    }
+
+    // если чат стал “свежее”, поднимем вверх (по last_message_at API уже отсортирован)
+    // проще: пересобрать порядок как у API — но без “мигания”:
+    // тут лайтово: если unread вырос — поднимем
+    if (Number(c.unread_count || 0) > 0) {
+      list.prepend(node);
+    }
+  }
+
+  async function poll() {
+    if (!polling) return;
+    try {
+      const r = await fetch(`/api/support/admin/inbox/?tab=${encodeURIComponent(tab)}`, {
+        headers: {'X-Requested-With': 'XMLHttpRequest'}
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data.ok) return;
+
+      const chats = Array.isArray(data.chats) ? data.chats : [];
+      // если пусто — покажем сообщение
+      if (!chats.length) {
+        list.innerHTML = `<div class="alert alert-secondary">Чатов пока нет.</div>`;
+        return;
+      }
+
+      // если там был alert — очистим
+      if (list.querySelector('.alert')) list.innerHTML = '';
+
+      // обновляем/добавляем
+      for (const c of chats) upsertRow(c);
+
+      // опционально: удалить чаты, которых больше нет в текущем табе
+      const ids = new Set(chats.map(x => String(x.id)));
+      list.querySelectorAll('[data-chat-id]').forEach(n => {
+        if (!ids.has(String(n.getAttribute('data-chat-id')))) n.remove();
+      });
+
+    } catch (e) {
+      // молча
+    } finally {
+      hint && (hint.style.display = 'none');
+    }
+  }
+
+  // чтобы не жечь ресурсы в фоне
+  document.addEventListener('visibilitychange', () => {
+    polling = !document.hidden;
+  });
+
+  // каждые 2 секунды
+  poll();
+  const timer = setInterval(poll, 2000);
+  window.addEventListener('beforeunload', () => clearInterval(timer));
+})();
+</script>
+
+{% endblock %}

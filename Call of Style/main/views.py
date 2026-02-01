@@ -1,15 +1,17 @@
 # main/views.py
 import json
 import re
+import random
 from datetime import datetime, date
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
-from django.db.models import Avg, Q, Count
+from django.db.models import Avg, Q, F, Count
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
+from django.middleware.csrf import get_token
 from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
@@ -19,7 +21,8 @@ import urllib.parse
 import urllib.request
 from django.db import transaction
 from .forms import ReviewForm, ProfileUpdateForm
-
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 from .models import (
     CustomUser,
     Country,
@@ -405,7 +408,8 @@ def home(request):
 
 def index(request):
     products = Product.objects.all().order_by('-created_at')[:10]
-    return render(request, 'index.html', {'products': products})
+    today_products = get_random_products(limit=5)
+    return render(request, 'index.html', {'products': products,"today_products": today_products,})
 
 
 def login_view(request):
@@ -461,6 +465,16 @@ def toggle_favorite(request, product_id):
         next_url = "/profile/#favorites"
 
     return redirect(next_url)
+
+def get_random_products(limit=12):
+    qs = Product.objects.all()
+
+    total = qs.count()
+    if total <= limit:
+        return qs.order_by('-id')[:limit]
+
+    start = random.randint(0, max(0, total - limit))
+    return qs.order_by('-id')[start:start + limit]
 
 # =========================
 # catalog
@@ -695,7 +709,8 @@ def support_chat(request, chat_type='support', product_id=None):
     product = None
     if product_id is not None:
         product = get_object_or_404(Product, id=product_id)
-
+    if chat_type != "support":
+        return HttpResponseForbidden("Этот тип чата временно недоступен")
     chat, _created = Chat.objects.get_or_create(
         chat_type=chat_type,
         user=request.user,
@@ -703,10 +718,16 @@ def support_chat(request, chat_type='support', product_id=None):
         defaults={'is_active': True}
     )
 
+    Message.objects.filter(chat=chat).exclude(sender=request.user).filter(is_read=False).update(is_read=True)
+
     if request.method == 'POST':
         text = request.POST.get('message')
         if text:
             Message.objects.create(chat=chat, sender=request.user, text=text)
+            chat.last_message_at = timezone.now()
+            if chat.status == "waiting":
+                chat.status = "open"  # оператор ждёт — пользователь ответил
+            chat.save(update_fields=["last_message_at", "status"])
             if product_id is not None:
                 return redirect('support_chat_product', chat_type=chat_type, product_id=product_id)
             return redirect('support_chat', chat_type=chat_type)
@@ -730,6 +751,449 @@ def send_message(request, chat_id):
         return redirect('support_chat_product', chat_type=chat.chat_type, product_id=chat.product_id)
     return redirect('support_chat', chat_type=chat.chat_type)
 
+@login_required
+@require_GET
+def api_support_chat_messages(request, chat_id: int):
+    """
+    Возвращает новые сообщения чата (по last_id).
+    GET /api/support/chat/<chat_id>/messages/?last_id=123
+    """
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support", user=request.user)
+
+    try:
+        last_id = int(request.GET.get("last_id") or 0)
+    except ValueError:
+        last_id = 0
+
+    qs = (
+        chat.messages
+        .select_related("sender")
+        .filter(id__gt=last_id)
+        .order_by("created_at")
+    )
+
+    # отмечаем входящие как прочитанные
+    (chat.messages
+        .exclude(sender=request.user)
+        .filter(is_read=False)
+        .update(is_read=True)
+    )
+
+    items = []
+    for m in qs:
+        items.append({
+            "id": m.id,
+            "text": m.text,
+            "created_at": m.created_at.strftime("%d.%m %H:%M"),
+            "is_mine": (m.sender_id == request.user.id),
+        })
+
+    return JsonResponse({
+        "ok": True,
+        "chat_id": chat.id,
+        "status": chat.status,
+        "assigned_to": (
+            (chat.assigned_to.first_name or chat.assigned_to.email) if getattr(chat, "assigned_to", None) else ""
+        ),
+        "messages": items,
+        "last_id": items[-1]["id"] if items else last_id,
+    })
+
+
+@login_required
+@require_POST
+def api_support_chat_send(request, chat_id: int):
+    """
+    Отправка сообщения в чат (JSON).
+    POST /api/support/chat/<chat_id>/send/
+    body: {"text": "..." }
+    """
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support", user=request.user)
+
+    if chat.status == "closed":
+        return JsonResponse({"ok": False, "message": "Чат закрыт"}, status=400)
+
+    try:
+        data = json.loads(request.body.decode("utf-8") or "{}")
+    except Exception:
+        data = {}
+
+    text = (data.get("text") or "").strip()
+    if not text:
+        return JsonResponse({"ok": False, "message": "Пустое сообщение"}, status=400)
+
+    msg = Message.objects.create(chat=chat, sender=request.user, text=text)
+
+    # обновим метки чата
+    chat.last_message_at = timezone.now()
+    if chat.status == "waiting":
+        chat.status = "open"
+    chat.save(update_fields=["last_message_at", "status"])
+
+    return JsonResponse({
+        "ok": True,
+        "message": {
+            "id": msg.id,
+            "text": msg.text,
+            "created_at": msg.created_at.strftime("%d.%m %H:%M"),
+            "is_mine": True,
+        }
+    })
+
+def is_support_user(user):
+    return user.is_authenticated and (user.is_superuser or user.is_staff)
+@login_required
+def support_admin_inbox(request):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    tab = (request.GET.get("tab") or "open").strip()
+
+    qs = (
+        Chat.objects
+        .filter(chat_type="support")
+        .select_related("user", "product", "assigned_to")
+        .annotate(
+            unread_count=Count(
+                "messages",
+                filter=Q(messages__is_read=False) & Q(messages__sender_id=F("user_id"))
+            )
+        )
+        .order_by("-last_message_at", "-id")
+    )
+
+    if tab == "mine":
+        qs = qs.filter(assigned_to=request.user).exclude(status="closed")
+    elif tab == "closed":
+        qs = qs.filter(status="closed")
+    else:
+        qs = qs.exclude(status="closed")
+
+    return render(request, "support_admin_inbox.html", {
+        "chats": qs[:300],
+        "tab": tab,
+    })
+
+@login_required
+def support_admin_chat(request, chat_id: int):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    chat = get_object_or_404(
+        Chat.objects.select_related("user", "product", "assigned_to"),
+        id=chat_id,
+        chat_type="support",
+    )
+
+    Message.objects.filter(chat=chat, sender=chat.user, is_read=False).update(is_read=True)
+    msgs = chat.messages.select_related("sender").order_by("created_at")
+
+    return render(request, "support_admin_chat.html", {
+        "chat": chat,
+        "messages": msgs,
+    })
+
+
+@login_required
+@require_POST
+def support_admin_send_message(request, chat_id: int):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        return HttpResponseForbidden("Чат ведёт другой оператор")
+
+    if chat.status == "closed":
+        messages.error(request, "Чат закрыт")
+        return redirect("support_admin_chat", chat_id=chat.id)
+
+    text = (request.POST.get("message") or "").strip()
+    if not text:
+        return redirect("support_admin_chat", chat_id=chat.id)
+
+    Message.objects.create(chat=chat, sender=request.user, text=text)
+    chat.last_message_at = timezone.now()
+    if chat.status == "open":
+        chat.status = "waiting"  # например: ждём пользователя
+    chat.save(update_fields=["last_message_at", "status"])
+
+    return redirect("support_admin_chat", chat_id=chat.id)
+
+@login_required
+@require_POST
+def support_admin_take_chat(request, chat_id: int):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+
+    # если уже назначен на другого — запрет (кроме суперюзера)
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        messages.error(request, "Этот чат уже ведёт другой оператор")
+        return redirect(request.META.get("HTTP_REFERER") or "support_admin_inbox")
+
+    chat.assigned_to = request.user
+    chat.status = "open"
+    chat.save(update_fields=["assigned_to", "status"])
+
+    return redirect("support_admin_chat", chat_id=chat.id)
+
+@login_required
+@require_POST
+def support_admin_release_chat(request, chat_id: int):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+
+    # снять может только тот, на кого назначено (или суперюзер)
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        return HttpResponseForbidden("Нет доступа")
+
+    chat.assigned_to = None
+    chat.save(update_fields=["assigned_to"])
+    return redirect(request.META.get("HTTP_REFERER") or "support_admin_inbox")
+
+@login_required
+@require_POST
+def support_admin_reopen_chat(request, chat_id: int):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+
+    # отвечать/открывать может назначенный или суперюзер
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        return HttpResponseForbidden("Чат ведёт другой оператор")
+
+    chat.status = "open"
+    chat.save(update_fields=["status"])
+    return redirect("support_admin_chat", chat_id=chat.id)
+
+@login_required
+@require_POST
+def support_admin_close_chat(request, chat_id: int):
+    if not is_support_user(request.user):
+        return HttpResponseForbidden("Нет доступа")
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+    chat.status = "closed"
+    chat.save(update_fields=["status"])
+    return redirect("support_admin_chat", chat_id=chat.id)
+
+def _msg_to_dict(m: Message, me_id: int):
+    is_operator = (m.sender.is_staff or m.sender.is_superuser)
+    return {
+        "id": m.id,
+        "text": m.text,
+        "created_at": m.created_at.strftime("%d.%m %H:%M"),
+        "sender_id": m.sender_id,
+        "is_me": (m.sender_id == me_id),
+        "is_operator": is_operator,
+        "is_read": m.is_read,
+    }
+
+# ---------------------------
+# USER: get messages (poll)
+# GET /api/support/messages/?chat_id=5&after=123
+# ---------------------------
+@login_required
+@require_GET
+def api_support_messages(request):
+    chat_id = request.GET.get("chat_id")
+    after = request.GET.get("after") or "0"
+
+    if not (chat_id and chat_id.isdigit() and after.isdigit()):
+        return JsonResponse({"ok": False, "message": "bad params"}, status=400)
+
+    chat = get_object_or_404(Chat, id=int(chat_id), user=request.user, chat_type="support")
+
+    qs = chat.messages.select_related("sender").filter(id__gt=int(after)).order_by("id")
+    data = [_msg_to_dict(m, request.user.id) for m in qs]
+
+    # пометить как прочитанные все входящие (не от меня)
+    Message.objects.filter(chat=chat).exclude(sender=request.user).filter(is_read=False).update(is_read=True)
+
+    return JsonResponse({"ok": True, "messages": data})
+
+
+# ---------------------------
+# USER: send
+# POST /api/support/send/  {chat_id, message}
+# ---------------------------
+@login_required
+@require_POST
+def api_support_send(request):
+    chat_id = request.POST.get("chat_id")
+    text = (request.POST.get("message") or "").strip()
+
+    if not (chat_id and chat_id.isdigit()):
+        return JsonResponse({"ok": False, "message": "bad chat_id"}, status=400)
+    if not text:
+        return JsonResponse({"ok": False, "message": "empty"}, status=400)
+
+    chat = get_object_or_404(Chat, id=int(chat_id), user=request.user, chat_type="support")
+    if chat.status == "closed":
+        return JsonResponse({"ok": False, "message": "chat closed"}, status=403)
+
+    m = Message.objects.create(chat=chat, sender=request.user, text=text)
+    chat.last_message_at = timezone.now()
+    if chat.status == "waiting":
+        chat.status = "open"
+    chat.save(update_fields=["last_message_at", "status"])
+
+    return JsonResponse({"ok": True, "message": _msg_to_dict(m, request.user.id)})
+
+
+# ---------------------------
+# ADMIN: inbox list (poll)
+# GET /api/support/admin/inbox/?tab=open
+# ---------------------------
+@login_required
+@require_GET
+def api_support_admin_inbox(request):
+    if not is_support_user(request.user):
+        return JsonResponse({"ok": False, "message": "forbidden"}, status=403)
+
+    tab = (request.GET.get("tab") or "open").strip()
+
+    qs = (
+        Chat.objects
+        .filter(chat_type="support")
+        .select_related("user", "product", "assigned_to")
+        .annotate(
+            unread_count=Count("messages", filter=Q(messages__is_read=False))
+        )
+        .order_by("-last_message_at", "-id")
+    )
+
+    if tab == "mine":
+        qs = qs.filter(assigned_to=request.user).exclude(status="closed")
+    elif tab == "closed":
+        qs = qs.filter(status="closed")
+    else:
+        qs = qs.exclude(status="closed")
+
+    rows = []
+    for c in qs[:300]:
+        rows.append({
+            "id": c.id,
+            "user": c.user.first_name or c.user.email,
+            "product": c.product.title if c.product else "",
+            "status": c.status,
+            "status_label": c.get_status_display(),
+            "assigned_to": (c.assigned_to.first_name or c.assigned_to.email) if c.assigned_to else "",
+            "assigned_to_id": c.assigned_to_id,
+            "last_message_at": c.last_message_at.strftime("%d.%m %H:%M") if c.last_message_at else "—",
+            "unread_count": c.unread_count,
+        })
+
+    return JsonResponse({"ok": True, "chats": rows})
+
+
+# ---------------------------
+# ADMIN: chat messages
+# GET /api/support/admin/chat/<id>/messages/?after=123
+# ---------------------------
+@login_required
+@require_GET
+def api_support_admin_messages(request, chat_id: int):
+    if not is_support_user(request.user):
+        return JsonResponse({"ok": False, "message": "forbidden"}, status=403)
+
+    after = request.GET.get("after") or "0"
+    if not after.isdigit():
+        return JsonResponse({"ok": False, "message": "bad after"}, status=400)
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+    qs = chat.messages.select_related("sender").filter(id__gt=int(after)).order_by("id")
+    data = [_msg_to_dict(m, request.user.id) for m in qs]
+
+    # пометить как прочитанные все входящие (не от меня)
+    Message.objects.filter(chat=chat).exclude(sender=request.user).filter(is_read=False).update(is_read=True)
+
+    return JsonResponse({"ok": True, "messages": data, "chat": {"status": chat.status, "assigned_to_id": chat.assigned_to_id}})
+
+
+# ---------------------------
+# ADMIN: send
+# POST /api/support/admin/chat/<id>/send/ {message}
+# ---------------------------
+@login_required
+@require_POST
+def api_support_admin_send(request, chat_id: int):
+    if not is_support_user(request.user):
+        return JsonResponse({"ok": False, "message": "forbidden"}, status=403)
+
+    text = (request.POST.get("message") or "").strip()
+    if not text:
+        return JsonResponse({"ok": False, "message": "empty"}, status=400)
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+    if chat.status == "closed":
+        return JsonResponse({"ok": False, "message": "chat closed"}, status=403)
+
+    # запрет ответа, если чат назначен на другого (кроме superuser)
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        return JsonResponse({"ok": False, "message": "assigned to another operator"}, status=403)
+
+    m = Message.objects.create(chat=chat, sender=request.user, text=text)
+    chat.last_message_at = timezone.now()
+    if chat.status == "open":
+        chat.status = "waiting"
+    chat.save(update_fields=["last_message_at", "status"])
+
+    return JsonResponse({"ok": True, "message": _msg_to_dict(m, request.user.id)})
+
+
+# ---------------------------
+# ADMIN: take/release/close (AJAX)
+# ---------------------------
+@login_required
+@require_POST
+def api_support_admin_take(request, chat_id: int):
+    if not is_support_user(request.user):
+        return JsonResponse({"ok": False}, status=403)
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        return JsonResponse({"ok": False, "message": "already assigned"}, status=409)
+
+    chat.assigned_to = request.user
+    chat.status = "open"
+    chat.save(update_fields=["assigned_to", "status"])
+    return JsonResponse({"ok": True, "assigned_to_id": chat.assigned_to_id})
+
+
+@login_required
+@require_POST
+def api_support_admin_release(request, chat_id: int):
+    if not is_support_user(request.user):
+        return JsonResponse({"ok": False}, status=403)
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+
+    if chat.assigned_to_id and chat.assigned_to_id != request.user.id and not request.user.is_superuser:
+        return JsonResponse({"ok": False, "message": "forbidden"}, status=403)
+
+    chat.assigned_to = None
+    chat.save(update_fields=["assigned_to"])
+    return JsonResponse({"ok": True})
+
+
+@login_required
+@require_POST
+def api_support_admin_close(request, chat_id: int):
+    if not is_support_user(request.user):
+        return JsonResponse({"ok": False}, status=403)
+
+    chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
+    chat.status = "closed"
+    chat.save(update_fields=["status"])
+    return JsonResponse({"ok": True, "status": "closed"})
 
 # =========================
 # add product

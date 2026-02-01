@@ -5,60 +5,64 @@
 
 {% block content %}
 <div class="catalog-page">
-    <!-- Заголовок и сортировка -->
-    <div class="catalog-header">
-        <h1>Каталог товаров</h1>
+  <div class="container px-3 px-lg-0">
+
+    <div class="catalog-header mb-3">
+      <h1 class="catalog-title mb-3">Каталог товаров</h1>
+
+      {# ✅ ВЕРХНЯЯ ПАНЕЛЬ: категории + сортировка #}
+      <div class="catalog-filters mb-4">
+
+        <h3 class="mb-2">Категории</h3>
+
+        <ul class="category-list category-list--row mb-3" id="catalog-categories">
+          <li>
+            <a href="{% url 'catalog' %}{% if sort_by %}?sort={{ sort_by }}{% endif %}"
+               class="{% if not current_category %}active{% endif %}"
+               data-catalog-link>
+              Все товары
+            </a>
+          </li>
+
+          {% for category in categories %}
+          <li>
+            {# формируем ссылку с сохранением sort #}
+            <a href="{% url 'catalog' %}?category={{ category.id }}{% if sort_by %}&sort={{ sort_by }}{% endif %}"
+               class="{% if current_category == category.id|stringformat:'i' %}active{% endif %}"
+               data-catalog-link>
+              {{ category.name }}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+
         <div class="catalog-controls">
-            <!-- Сортировка -->
-            <select name="sort" onchange="this.form.submit()" class="sort-select">
-                <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Сначала новые</option>
-                <option value="popular" {% if sort_by == 'popular' %}selected{% endif %}>Популярные</option>
-            </select>
+          <label for="catalog-sort" class="mb-1" style="display:block;">Сортировка</label>
+          <select id="catalog-sort" name="sort" class="sort-select w-100">
+            <option value="newest" {% if sort_by == 'newest' %}selected{% endif %}>Сначала новые</option>
+            <option value="popular" {% if sort_by == 'popular' %}selected{% endif %}>Популярные</option>
+          </select>
         </div>
+
+      </div>
     </div>
 
-    <div class="row g-4 catalog-grid">
-        <aside class="col-12 col-lg-3">
-        <!-- Боковая панель с фильтрами -->
-        <div class="catalog-filters">
-            <h3>Категории</h3>
-            <ul class="category-list">
-                <li>
-                    <a href="{% url 'catalog' %}" 
-                       class="{% if not current_category %}active{% endif %}">
-                        Все товары
-                    </a>
-                </li>
-                {% for category in categories %}
-                <li>
-                    <a href="{% url 'catalog' %}?category={{ category.id }}" 
-                       class="{% if current_category == category.id|stringformat:'i' %}active{% endif %}">
-                        {{ category.name }}
-                    </a>
-                </li>
-                {% endfor %}
-            </ul>
-        </div>
-        </aside>
-
-        <!-- Основной контент -->
-        <main class="catalog-content">
-          <div class="px-2 px-md-0">   {# или px-3, если хочешь больше воздуха #}
-            <div class="row gx-3 gy-3">
-              {% for product in page_obj %}
-                <div class="col-6 col-md-4 col-lg-3">
-                  {% include "main/_product_card.html" with product=product %}
-                </div>
-              {% empty %}
-                <div class="no-products">
-                  <p>Товары не найдены</p>
-                  <a href="{% url 'catalog' %}" class="btn-primary">Сбросить фильтры</a>
-                </div>
-              {% endfor %}
-            </div>
+    {# ✅ ТОВАРЫ: этот блок будет обновляться через fetch #}
+    <div id="catalog-products" data-url="{% url 'catalog' %}">
+      <div class="row gx-3 gy-3">
+        {% for product in page_obj %}
+          <div class="col-12 col-md-6 col-lg-4">
+            {% include "main/_product_card.html" with product=product %}
           </div>
-        </main>
-
+        {% empty %}
+          <div class="no-products">
+            <p>Товары не найдены</p>
+            <a href="{% url 'catalog' %}" class="btn-primary">Сбросить фильтры</a>
+          </div>
+        {% endfor %}
+      </div>
     </div>
+
+  </div>
 </div>
 {% endblock %}

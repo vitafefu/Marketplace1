@@ -30,8 +30,9 @@
       {% if user.can_sell %}
         <a href="{% url 'add_product' %}" class="nav-item">Добавить товар</a>
         <a href="#my_products" class="nav-item">Мои товары</a>
-      {% else %}
-        <a href="{% url 'support_chat' 'support' %}" class="nav-item">🛠️ Техподдержка</a>
+      {% endif %}
+      {% if user.is_authenticated and user.is_staff %}
+        <a href="{% url 'support_admin_inbox' %}" class="nav-item">🛠️ Техподдержка (админ)</a>
       {% endif %}
 
       <form method="POST" action="{% url 'logout' %}" class="logout-form">

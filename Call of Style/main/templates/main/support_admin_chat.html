@@ -1,0 +1,199 @@
+{% extends "base.html" %}
+{% block title %}Чат #{{ chat.id }} — Техподдержка{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width:1000px">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:20px 0">
+    <div>
+      <h1 style="margin:0">Чат #{{ chat.id }}</h1>
+      <div style="color:#666;margin-top:6px">
+        Пользователь: <b>{{ chat.user.first_name|default:chat.user.email }}</b>
+        {% if chat.product %} • Товар: <a href="{% url 'product_detail' chat.product.id %}">{{ chat.product.title }}</a>{% endif %}
+        <div style="margin-top:4px">
+          Статус: <b>{{ chat.get_status_display }}</b>
+          Оператор:
+          {% if chat.assigned_to %}<b>{{ chat.assigned_to.first_name|default:chat.assigned_to.email }}</b>
+          {% else %}<b>не назначен</b>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'support_admin_inbox' %}">← В инбокс</a>
+
+      {% if not chat.assigned_to %}
+        <form method="POST" action="{% url 'support_admin_take_chat' chat.id %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-dark" type="submit">Взять в работу</button>
+        </form>
+      {% endif %}
+
+      {% if chat.assigned_to %}
+        {% if chat.assigned_to.id == user.id or user.is_superuser %}
+          <form method="POST" action="{% url 'support_admin_release_chat' chat.id %}">
+            {% csrf_token %}
+            <button class="btn btn-sm btn-outline-secondary" type="submit">Снять с себя</button>
+          </form>
+        {% endif %}
+      {% endif %}
+
+
+      {% if chat.status != 'closed' %}
+        <form method="POST" action="{% url 'support_admin_close_chat' chat.id %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-danger" type="submit">Закрыть</button>
+        </form>
+      {% else %}
+        <form method="POST" action="{% url 'support_admin_reopen_chat' chat.id %}">
+          {% csrf_token %}
+          <button class="btn btn-sm btn-outline-success" type="submit">Открыть заново</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <div id="chat-box"
+       class="chat-messages"
+       style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;max-height:60vh;overflow:auto">
+    {% for message in messages %}
+      <div style="margin:10px 0;display:flex;{% if message.sender.is_staff or message.sender.is_superuser %}justify-content:flex-end{% else %}justify-content:flex-start{% endif %}">
+        <div data-mid="{{ message.id }}" style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
+          <div style="font-size:.85rem;color:#666;margin-bottom:6px">
+            {% if message.sender.is_staff or message.sender.is_superuser %}Оператор{% else %}Пользователь{% endif %}
+            {{ message.created_at|date:"d.m H:i" }}
+          </div>
+          <div style="white-space:pre-wrap">{{ message.text }}</div>
+        </div>
+      </div>
+    {% empty %}
+      <div style="color:#666">Сообщений нет.</div>
+    {% endfor %}
+  </div>
+
+  <div style="margin:14px 0 30px">
+    {% if chat.status == 'closed' %}
+      <div class="alert alert-warning">Чат закрыт.</div>
+    {% else %}
+      {% if chat.assigned_to and chat.assigned_to.id != user.id and not user.is_superuser %}
+        <div class="alert alert-secondary">
+          Этот чат ведёт другой оператор: <b>{{ chat.assigned_to.first_name|default:chat.assigned_to.email }}</b>.
+          Чтобы ответить — возьмите другой чат или попросите снять назначение.
+        </div>
+      {% else %}
+        <form id="send-form" method="POST" action="{% url 'support_admin_send_message' chat.id %}" style="display:flex;gap:10px">
+          {% csrf_token %}
+          <input id="send-input" class="form-control" type="text" name="message" placeholder="Введите ответ..." required autocomplete="off">
+          <button class="btn btn-dark" type="submit">Отправить</button>
+        </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    const box = document.getElementById('chat-box');
+    if (box) box.scrollTop = box.scrollHeight;
+  });
+</script>
+<script>
+  window.addEventListener('pageshow', function (e) {
+    // если страница восстановлена из back/forward cache
+    if (e.persisted) {
+      const inp = document.querySelector('input[name="message"]');
+      if (inp) inp.value = '';
+    }
+  });
+</script>
+<script>
+(function () {
+  const chatId = {{ chat.id }};
+  const chatBox = document.getElementById('chat-box');
+
+  const form = document.getElementById('send-form');
+  const input = document.getElementById('send-input');
+
+  // стартовый lastId — возьмём из DOM (мы добавим data-mid ниже)
+  let lastId = (function(){
+    const nodes = chatBox ? chatBox.querySelectorAll('[data-mid]') : [];
+    if (!nodes.length) return 0;
+    return parseInt(nodes[nodes.length - 1].getAttribute('data-mid') || '0', 10) || 0;
+  })();
+
+  function escapeHtml(s) {
+    return (s || '').replace(/[&<>"']/g, c => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+    }[c]));
+  }
+
+  function addMessage(m) {
+    if (!chatBox) return;
+
+    const wrap = document.createElement('div');
+    wrap.style.margin = '10px 0';
+    wrap.style.display = 'flex';
+    wrap.style.justifyContent = m.is_operator ? 'flex-end' : 'flex-start';
+
+    wrap.innerHTML = `
+      <div data-mid="${m.id}" style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
+        <div style="font-size:.85rem;color:#666;margin-bottom:6px">
+          ${m.is_operator ? 'Оператор' : 'Пользователь'} • ${escapeHtml(m.created_at)}
+        </div>
+        <div style="white-space:pre-wrap">${escapeHtml(m.text)}</div>
+      </div>
+    `;
+
+    chatBox.appendChild(wrap);
+    lastId = Math.max(lastId, m.id);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+
+  async function poll() {
+    try {
+      const r = await fetch(`/api/support/admin/chat/${chatId}/messages/?after=${lastId}`, {
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!r.ok) return;
+      const data = await r.json();
+      if (!data.ok) return;
+      (data.messages || []).forEach(addMessage);
+    } catch (e) {}
+  }
+
+  // отправка без перезагрузки
+  if (form && input) {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const text = input.value.trim();
+      if (!text) return;
+
+      const fd = new FormData();
+      fd.append('message', text);
+
+      const csrf = form.querySelector('input[name="csrfmiddlewaretoken"]');
+      if (csrf) fd.append('csrfmiddlewaretoken', csrf.value);
+
+      try {
+        const r = await fetch(`/api/support/admin/chat/${chatId}/send/`, {
+          method: 'POST',
+          body: fd,
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await r.json();
+        if (data.ok && data.message) {
+          addMessage(data.message);
+          input.value = '';
+          history.replaceState(null, '', location.pathname); // 1 запись в истории
+        }
+      } catch (e) {}
+    });
+  }
+
+  setInterval(poll, 1200);
+  poll();
+})();
+</script>
+
+{% endblock %}

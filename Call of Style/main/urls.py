@@ -27,9 +27,29 @@ urlpatterns = [
     path('logout/', auth_views.LogoutView.as_view(next_page='/'), name='logout'),
     path('product/<int:product_id>/', views.product_detail, name='product_detail'),
     path('product/<int:product_id>/edit/', views.edit_product, name='edit_product'),
-    path('support/<str:chat_type>/', views.support_chat, name='support_chat'),
-    path('support/<str:chat_type>/<int:product_id>/', views.support_chat, name='support_chat_product'),
+    path('support/', views.support_chat, {'chat_type': 'support'}, name='support_chat'),
+    path('support/product/<int:product_id>/', views.support_chat, {'chat_type': 'support'},name='support_chat_product'),
     path('chat/<int:chat_id>/send/', views.send_message, name='send_message'),
+    path("support/admin/", views.support_admin_inbox, name="support_admin_inbox"),
+    path("support/admin/chat/<int:chat_id>/", views.support_admin_chat, name="support_admin_chat"),
+    path("support/admin/chat/<int:chat_id>/send/", views.support_admin_send_message, name="support_admin_send_message"),
+    path("support/admin/chat/<int:chat_id>/take/", views.support_admin_take_chat, name="support_admin_take_chat"),
+    path("support/admin/chat/<int:chat_id>/close/", views.support_admin_close_chat, name="support_admin_close_chat"),
+    path("support/admin/chat/<int:chat_id>/release/", views.support_admin_release_chat, name="support_admin_release_chat"),
+    path("support/admin/chat/<int:chat_id>/reopen/", views.support_admin_reopen_chat, name="support_admin_reopen_chat"),
+
+    # admin inbox ajax
+    path("api/support/admin/inbox/", views.api_support_admin_inbox, name="api_support_admin_inbox"),
+
+    # admin chat ajax
+    path("api/support/admin/chat/<int:chat_id>/messages/", views.api_support_admin_messages, name="api_support_admin_messages"),
+    path("api/support/admin/chat/<int:chat_id>/send/", views.api_support_admin_send, name="api_support_admin_send"),
+    path("api/support/admin/chat/<int:chat_id>/take/", views.api_support_admin_take, name="api_support_admin_take"),
+    path("api/support/admin/chat/<int:chat_id>/release/", views.api_support_admin_release, name="api_support_admin_release"),
+    path("api/support/admin/chat/<int:chat_id>/close/", views.api_support_admin_close, name="api_support_admin_close"),
+    path("api/support/chat/<int:chat_id>/messages/", views.api_support_chat_messages, name="api_support_chat_messages"),
+    path("api/support/chat/<int:chat_id>/send/", views.api_support_chat_send, name="api_support_chat_send"),
+
     path('review/<int:review_id>/delete/', views.delete_review, name='delete_review'),
     path('api/reviews/create/', views.api_review_create, name='api_review_create'),
     path('api/reviews/<int:review_id>/update/', views.api_review_update, name='api_review_update'),

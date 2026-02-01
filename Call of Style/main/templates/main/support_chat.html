@@ -1,49 +1,219 @@
-{% extends 'base.html' %}
-{% load static %}
-
-{% block title %}Чат поддержки - Call of Style{% endblock %}
+{% extends "base.html" %}
+{% block title %}Техподдержка{% endblock %}
 
 {% block content %}
-<div class="chat-page">
-    <div class="chat-header">
-        <h1>
-            {% if chat.chat_type == 'seller' %}
-                Чат с продавцом
-            {% elif chat.chat_type == 'consultant' %}
-                Чат с консультантом
+<div class="container" style="max-width:1000px" data-chat-id="{{ chat.id }}" id="support-chat-root">
+
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin:20px 0">
+    <div>
+      <h1 style="margin:0">🛠️ Техподдержка</h1>
+
+      <div style="color:#666;margin-top:6px">
+        {% if chat.product %}
+          Товар:
+          <a href="{% url 'product_detail' chat.product.id %}">
+            {{ chat.product.title }}
+          </a>
+        {% endif %}
+
+        <div style="margin-top:4px">
+          Собеседник: <b>Оператор</b>
+          {% if chat.assigned_to %}
+            • Назначен: <b>{{ chat.assigned_to.first_name|default:chat.assigned_to.email }}</b>
+          {% else %}
+            • <b>Ожидайте, вам ответят</b>
+          {% endif %}
+        </div>
+
+        <div style="margin-top:4px">
+          Статус: <b>{{ chat.get_status_display }}</b>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <a class="btn btn-sm btn-outline-dark" href="{% url 'profile' %}">← В профиль</a>
+    </div>
+  </div>
+
+  <div id="chat-box"
+       class="chat-messages"
+       style="background:#fff;border:1px solid #eee;border-radius:12px;padding:14px;max-height:60vh;overflow:auto" >
+    {% for message in messages %}
+      <div style="margin:10px 0;display:flex;{% if message.sender_id == user.id %}justify-content:flex-end{% else %}justify-content:flex-start{% endif %}">
+        <div data-mid="{{ message.id }}" style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
+          <div style="font-size:.85rem;color:#666;margin-bottom:6px">
+            {% if message.sender_id == user.id %}
+              Вы
             {% else %}
-                Техподдержка
+              Оператор
             {% endif %}
-        </h1>
-        <div class="chat-info">
-            {% if chat.product %}
-            <p>Товар: <a href="{% url 'product_detail' chat.product.id %}">{{ chat.product.title }}</a></p>
-            {% endif %}
-            <p>Собеседник: {{ chat.seller.username }}</p>
+            • {{ message.created_at|date:"d.m H:i" }}
+          </div>
+          <div style="white-space:pre-wrap">{{ message.text }}</div>
         </div>
-    </div>
+      </div>
+    {% empty %}
+      <div style="color:#666">Чат пуст. Напишите сообщение — оператор ответит.</div>
+    {% endfor %}
+  </div>
 
-    <div class="chat-messages" id="chat-messages">
-        {% for message in messages %}
-        <div class="message {% if message.sender == user %}message-sent{% else %}message-received{% endif %}">
-            <div class="message-content">
-                <p>{{ message.text }}</p>
-                <span class="message-time">{{ message.created_at|date:"H:i" }}</span>
-            </div>
-        </div>
-        {% empty %}
-        <div class="no-messages">
-            <p>Чат пуст. Начните общение!</p>
-        </div>
-        {% endfor %}
-    </div>
-
-    <form method="POST" class="chat-form">
+  <div style="margin:14px 0 30px">
+    {% if chat.status == 'closed' %}
+      <div class="alert alert-warning">Чат закрыт.</div>
+    {% else %}
+      <form id="chat-form" autocomplete="off" style="display:flex;gap:10px">
         {% csrf_token %}
-        <div class="message-input">
-            <input type="text" name="message" placeholder="Введите сообщение..." required>
-            <button type="submit">-></button>
-        </div>
-    </form>
+        <input id="chat-input" class="form-control" type="text" name="message" placeholder="Введите сообщение..." required autocomplete="off">
+        <button class="btn btn-dark" type="submit">Отправить</button>
+      </form>
+      <div id="chat-error" style="display:none;margin-top:10px" class="alert alert-danger"></div>
+    {% endif %}
+  </div>
 </div>
+
+<script>
+  function getCookie(name) {
+    const v = document.cookie.match('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)');
+    return v ? v.pop() : '';
+  }
+
+  function escapeHtml(s) {
+    return (s || '')
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#039;');
+  }
+
+  function renderMessage(m) {
+    const side = m.is_mine ? 'flex-end' : 'flex-start';
+    const who = m.is_mine ? 'Вы' : 'Оператор';
+    return `
+      <div style="margin:10px 0;display:flex;justify-content:${side}">
+        <div data-mid="${m.id}"
+             style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
+          <div style="font-size:.85rem;color:#666;margin-bottom:6px">
+            ${who} • ${escapeHtml(m.created_at)}
+          </div>
+          <div style="white-space:pre-wrap">${escapeHtml(m.text)}</div>
+        </div>
+      </div>
+    `;
+
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    const root = document.getElementById('support-chat-root');
+    const chatId = root?.dataset?.chatId;
+    const box = document.getElementById('chat-box');
+    const form = document.getElementById('chat-form');
+    const input = document.getElementById('chat-input');
+    const errBox = document.getElementById('chat-error');
+
+    if (box) box.scrollTop = box.scrollHeight;
+
+    let lastId = 0;
+    // попробуем вычислить lastId из уже отрендеренных сообщений (если нужно — просто оставим 0)
+    // (самый надежный вариант — хранить lastId в data-атрибуте, но это ок и так)
+    // lastId будет обновляться ответом API.
+
+    let polling = true;
+
+    function showError(msg) {
+      if (!errBox) return;
+      errBox.style.display = 'block';
+      errBox.textContent = msg || 'Ошибка';
+      setTimeout(() => { errBox.style.display = 'none'; }, 2500);
+    }
+
+    async function fetchNew() {
+      if (!chatId || !polling) return;
+
+      try {
+        const r = await fetch(`/api/support/chat/${chatId}/messages/?last_id=${lastId}`, {
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        });
+        const data = await r.json();
+        if (!data.ok) return;
+
+        if (Array.isArray(data.messages) && data.messages.length) {
+          const atBottom = (box.scrollHeight - box.scrollTop - box.clientHeight) < 80;
+
+          for (const m of data.messages) {
+            box.insertAdjacentHTML('beforeend', renderMessage(m));
+          }
+          lastId = data.last_id || lastId;
+
+          if (atBottom) box.scrollTop = box.scrollHeight;
+        }
+      } catch (e) {
+        // молча, чтобы не спамить
+      }
+    }
+
+    async function sendMessage(text) {
+      const csrftoken = getCookie('csrftoken');
+      const r = await fetch(`/api/support/chat/${chatId}/send/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': csrftoken,
+          'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ text })
+      });
+
+      const data = await r.json();
+      if (!data.ok) {
+        throw new Error(data.message || 'Ошибка отправки');
+      }
+      return data.message;
+    }
+
+    if (form && input) {
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const text = (input.value || '').trim();
+        if (!text) return;
+
+        input.disabled = true;
+        try {
+          const msg = await sendMessage(text);
+          // оптимистично добавим сразу (и lastId обновим)
+          box.insertAdjacentHTML('beforeend', renderMessage(msg));
+          lastId = Math.max(lastId, msg.id || 0);
+          input.value = '';
+          box.scrollTop = box.scrollHeight;
+        } catch (err) {
+          showError(err.message);
+        } finally {
+          input.disabled = false;
+          input.focus();
+        }
+      });
+    }
+
+    // polling
+    const timer = setInterval(fetchNew, 1500);
+
+    // стопаем polling, если вкладка скрыта (чтобы не жечь ресурсы)
+    document.addEventListener('visibilitychange', () => {
+      polling = !document.hidden;
+    });
+
+    // на уход со страницы
+    window.addEventListener('beforeunload', () => clearInterval(timer));
+  });
+
+  // убрать “залипание” текста при возврате назад
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) {
+      const inp = document.getElementById('chat-input');
+      if (inp) inp.value = '';
+    }
+  });
+</script>
 {% endblock %}
