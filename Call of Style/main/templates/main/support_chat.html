@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Техподдержка{% endblock %}
+{% block title %}Техподдержка - Call of Style{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1000px" data-chat-id="{{ chat.id }}" id="support-chat-root">
@@ -45,11 +45,14 @@
         <div data-mid="{{ message.id }}" style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
           <div style="font-size:.85rem;color:#666;margin-bottom:6px">
             {% if message.sender_id == user.id %}
-              Вы
+              <span>Вы • {{ message.created_at|date:"d.m H:i" }}</span>
+              <span class="read-flag"
+                    style="margin-left:8px;color:{% if message.is_read %}#4caf50{% else %}#999{% endif %}">
+                {% if message.is_read %}✓✓{% else %}✓{% endif %}
+              </span>
             {% else %}
-              Оператор
+              Оператор • {{ message.created_at|date:"d.m H:i" }}
             {% endif %}
-            • {{ message.created_at|date:"d.m H:i" }}
           </div>
             {% if message.image %}
               <div style="margin-bottom:8px">
@@ -105,7 +108,6 @@
   function renderMessage(m) {
     const side = m.is_mine ? 'flex-end' : 'flex-start';
     const who = m.is_mine ? 'Вы' : 'Оператор';
-
     const imgHtml = m.image_url
       ? `<div style="margin-bottom:8px">
            <a href="${escapeHtml(m.image_url)}" target="_blank">
@@ -117,12 +119,20 @@
 
     const textHtml = m.text ? `<div style="white-space:pre-wrap">${escapeHtml(m.text)}</div>` : '';
 
+    const readHtml = m.is_mine
+        ? `<span class="read-flag"
+                 style="margin-left:8px;color:${m.is_read ? '#4caf50' : '#999'}">
+             ${m.is_read ? '✓✓' : '✓'}
+           </span>`
+        : '';
+
     return `
       <div style="margin:10px 0;display:flex;justify-content:${side}">
         <div data-mid="${m.id}"
              style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
           <div style="font-size:.85rem;color:#666;margin-bottom:6px">
-            ${who} • ${escapeHtml(m.created_at)}
+            <span>${who} • ${escapeHtml(m.created_at)}</span>
+            ${readHtml}
           </div>
           ${imgHtml}
           ${textHtml}
@@ -173,19 +183,18 @@
     }
 
     // ждём ответят / назначение / статус — из data.status и data.assigned_to (как у тебя в API)
-    function applyChatState(data) {
-      if (!data) return;
+    function applyChatState(chat) {
+      if (!chat) return;
 
-      if (statusEl && typeof data.status !== 'undefined') {
-        const map = { open: 'Открыт', waiting: 'Ожидание', closed: 'Закрыт' };
-        statusEl.textContent = map[data.status] || data.status;
+      if (statusEl && typeof chat.status !== 'undefined') {
+        statusEl.textContent = chat.status_label || chat.status;
       }
 
-      if (assignedEl && typeof data.assigned_to !== 'undefined') {
-        assignedEl.textContent = data.assigned_to || 'Ожидайте, вам ответят';
+      if (assignedEl) {
+        assignedEl.textContent = chat.assigned_to_name || 'Ожидайте, вам ответят';
       }
 
-      const isClosed = (data.status === 'closed');
+      const isClosed = (chat.status === 'closed');
 
       if (isClosed) {
         if (lockedEl) {
@@ -198,6 +207,7 @@
         if (form) form.style.display = 'flex';
       }
     }
+
 
     // ===== автоскролл “как телега” =====
     let firstSync = true;
@@ -256,7 +266,7 @@
         const data = await r.json();
         if (!data.ok) return;
 
-        applyChatState(data);
+        applyChatState(data.chat);
 
         if (Array.isArray(data.messages) && data.messages.length) {
           for (const m of data.messages) {
@@ -266,6 +276,17 @@
 
           scrollToBottom();
           requestAnimationFrame(updateStick);
+        }
+
+        // обновление галочек на уже существующих сообщениях
+        if (Array.isArray(data.read_ids) && data.read_ids.length) {
+          for (const id of data.read_ids) {
+            const node = box.querySelector(`[data-mid="${id}"] .read-flag`);
+            if (node) {
+              node.textContent = '✓✓';
+              node.style.color = '#4caf50';
+            }
+          }
         }
 
         firstSync = false;
@@ -304,7 +325,7 @@
 
         try {
           const msg = await sendMessage(text, file);
-
+          msg.is_read = false;
           box.insertAdjacentHTML('beforeend', renderMessage(msg));
           lastId = Math.max(lastId, msg.id || 0);
 

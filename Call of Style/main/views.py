@@ -787,7 +787,15 @@ def api_support_chat_messages(request, chat_id: int):
             "created_at": m.created_at.strftime("%d.%m %H:%M"),
             "is_mine": (m.sender_id == request.user.id),
             "image_url": (m.image.url if getattr(m, "image", None) else ""),
+            "is_read": m.is_read,
         })
+
+    read_ids = list(
+        chat.messages
+        .filter(sender=request.user, is_read=True, id__lte=last_id)
+        .values_list("id", flat=True)
+        .order_by("-id")[:200]
+    )
 
     return JsonResponse({
         "ok": True,
@@ -803,6 +811,7 @@ def api_support_chat_messages(request, chat_id: int):
 
         "messages": items,
         "last_id": items[-1]["id"] if items else last_id,
+        "read_ids": read_ids,
     })
 @login_required
 @require_POST
@@ -855,6 +864,8 @@ def api_support_chat_send(request, chat_id: int):
             "created_at": msg.created_at.strftime("%d.%m %H:%M"),
             "is_mine": True,
             "image_url": (msg.image.url if msg.image else ""),
+            "is_read": msg.is_read,
+
         }
     })
 
@@ -1018,53 +1029,53 @@ def _msg_to_dict(m: Message, me_id: int):
 # USER: get messages (poll)
 # GET /api/support/messages/?chat_id=5&after=123
 # ---------------------------
-@login_required
-@require_GET
-def api_support_messages(request):
-    chat_id = request.GET.get("chat_id")
-    after = request.GET.get("after") or "0"
-
-    if not (chat_id and chat_id.isdigit() and after.isdigit()):
-        return JsonResponse({"ok": False, "message": "bad params"}, status=400)
-
-    chat = get_object_or_404(Chat, id=int(chat_id), user=request.user, chat_type="support")
-
-    qs = chat.messages.select_related("sender").filter(id__gt=int(after)).order_by("id")
-    data = [_msg_to_dict(m, request.user.id) for m in qs]
-
-    # пометить как прочитанные все входящие (не от меня)
-    Message.objects.filter(chat=chat).exclude(sender=request.user).filter(is_read=False).update(is_read=True)
-
-    return JsonResponse({"ok": True, "messages": data})
-
-
-# ---------------------------
-# USER: send
-# POST /api/support/send/  {chat_id, message}
-# ---------------------------
-@login_required
-@require_POST
-def api_support_send(request):
-    chat_id = request.POST.get("chat_id")
-    text = (request.POST.get("message") or "").strip()
-
-    if not (chat_id and chat_id.isdigit()):
-        return JsonResponse({"ok": False, "message": "bad chat_id"}, status=400)
-    if not text:
-        return JsonResponse({"ok": False, "message": "empty"}, status=400)
-
-    chat = get_object_or_404(Chat, id=int(chat_id), user=request.user, chat_type="support")
-    if chat.status == "closed":
-        return JsonResponse({"ok": False, "message": "chat closed"}, status=403)
-
-    m = Message.objects.create(chat=chat, sender=request.user, text=text)
-    chat.last_message_at = timezone.now()
-    if chat.status == "waiting":
-        chat.status = "open"
-    chat.save(update_fields=["last_message_at", "status"])
-
-    return JsonResponse({"ok": True, "message": _msg_to_dict(m, request.user.id)})
-
+# @login_required
+# @require_GET
+# def api_support_messages(request):
+#     chat_id = request.GET.get("chat_id")
+#     after = request.GET.get("after") or "0"
+#
+#     if not (chat_id and chat_id.isdigit() and after.isdigit()):
+#         return JsonResponse({"ok": False, "message": "bad params"}, status=400)
+#
+#     chat = get_object_or_404(Chat, id=int(chat_id), user=request.user, chat_type="support")
+#
+#     qs = chat.messages.select_related("sender").filter(id__gt=int(after)).order_by("id")
+#     data = [_msg_to_dict(m, request.user.id) for m in qs]
+#
+#     # пометить как прочитанные все входящие (не от меня)
+#     Message.objects.filter(chat=chat).exclude(sender=request.user).filter(is_read=False).update(is_read=True)
+#
+#     return JsonResponse({"ok": True, "messages": data})
+#
+#
+# # ---------------------------
+# # USER: send
+# # POST /api/support/send/  {chat_id, message}
+# # ---------------------------
+# @login_required
+# @require_POST
+# def api_support_send(request):
+#     chat_id = request.POST.get("chat_id")
+#     text = (request.POST.get("message") or "").strip()
+#
+#     if not (chat_id and chat_id.isdigit()):
+#         return JsonResponse({"ok": False, "message": "bad chat_id"}, status=400)
+#     if not text:
+#         return JsonResponse({"ok": False, "message": "empty"}, status=400)
+#
+#     chat = get_object_or_404(Chat, id=int(chat_id), user=request.user, chat_type="support")
+#     if chat.status == "closed":
+#         return JsonResponse({"ok": False, "message": "chat closed"}, status=403)
+#
+#     m = Message.objects.create(chat=chat, sender=request.user, text=text)
+#     chat.last_message_at = timezone.now()
+#     if chat.status == "waiting":
+#         chat.status = "open"
+#     chat.save(update_fields=["last_message_at", "status"])
+#
+#     return JsonResponse({"ok": True, "message": _msg_to_dict(m, request.user.id)})
+#
 
 # ---------------------------
 # ADMIN: inbox list (poll)
@@ -1126,6 +1137,8 @@ def api_support_admin_messages(request, chat_id: int):
     if not after.isdigit():
         return JsonResponse({"ok": False, "message": "bad after"}, status=400)
 
+    after_i = int(after)
+
     chat = get_object_or_404(Chat, id=chat_id, chat_type="support")
     qs = chat.messages.select_related("sender").filter(id__gt=int(after)).order_by("id")
     data = [_msg_to_dict(m, request.user.id) for m in qs]
@@ -1133,7 +1146,23 @@ def api_support_admin_messages(request, chat_id: int):
     # пометить как прочитанные все входящие (не от меня)
     Message.objects.filter(chat=chat).exclude(sender=request.user).filter(is_read=False).update(is_read=True)
 
-    return JsonResponse({"ok": True, "messages": data, "chat": {"status": chat.status, "assigned_to_id": chat.assigned_to_id}})
+    read_ids = list(
+        chat.messages
+        .filter(
+            Q(sender__is_staff=True) | Q(sender__is_superuser=True),
+            is_read=True,
+            id__lte=after_i
+        )
+        .values_list("id", flat=True)
+        .order_by("-id")[:200]
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "messages": data,
+        "chat": {"status": chat.status, "assigned_to_id": chat.assigned_to_id},
+        "read_ids": read_ids,
+    })
 
 
 # ---------------------------
@@ -1354,8 +1383,9 @@ def cities_suggest(request):
 @require_POST
 def api_login(request):
     wants_json = (
-        request.headers.get('x-requested-with') == 'XMLHttpRequest'
-        or 'application/json' in (request.headers.get('Accept') or '')
+            request.headers.get('x-requested-with') == 'XMLHttpRequest'
+            or 'application/json' in (request.headers.get('Accept') or '')
+            or ('application/json' in (request.content_type or ''))
     )
 
     def respond(payload, status=200):
@@ -1417,6 +1447,7 @@ class RegisterView(View):
         wants_json = (
                 request.headers.get('x-requested-with') == 'XMLHttpRequest'
                 or 'application/json' in (request.headers.get('Accept') or '')
+                or ('application/json' in (request.content_type or ''))
         )
 
         def respond(payload, status=200):

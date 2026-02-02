@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Чат #{{ chat.id }} — Техподдержка{% endblock %}
+{% block title %}Чат #{{ chat.id }}Техподдержка(Админ) - Call of Style{% endblock %}
 
 {% block content %}
 <div class="container" style="max-width:1000px" id="admin-chat-root"
@@ -46,6 +46,12 @@
           <div style="font-size:.85rem;color:#666;margin-bottom:6px">
             {% if message.sender.is_staff or message.sender.is_superuser %}Оператор{% else %}Пользователь{% endif %}
             • {{ message.created_at|date:"d.m H:i" }}
+
+            {% if message.sender.is_staff or message.sender.is_superuser %}
+              <span class="read-flag" style="margin-left:8px;color:{% if message.is_read %}#4caf50{% else %}#999{% endif %}">
+                {% if message.is_read %}✓✓{% else %}✓{% endif %}
+              </span>
+            {% endif %}
           </div>
           {% if message.image %}
             <div style="margin-bottom:8px">
@@ -153,10 +159,18 @@
       ? `<div style="white-space:pre-wrap">${escapeHtml(m.text)}</div>`
       : '';
 
+    const readHtml = m.is_operator
+      ? `<span class="read-flag"
+               style="margin-left:8px;color:${m.is_read ? '#4caf50' : '#999'}">
+           ${m.is_read ? '✓✓' : '✓'}
+         </span>`
+      : '';
+
     wrap.innerHTML = `
       <div data-mid="${m.id}" style="max-width:70%;padding:10px 12px;border-radius:12px;border:1px solid #eee;background:#f8f8f8">
         <div style="font-size:.85rem;color:#666;margin-bottom:6px">
-          ${m.is_operator ? 'Оператор' : 'Пользователь'} • ${escapeHtml(m.created_at)}
+          <span>${m.is_operator ? 'Оператор' : 'Пользователь'} • ${escapeHtml(m.created_at)}</span>
+          ${readHtml}
         </div>
         ${imgHtml}
         ${textHtml}
@@ -238,20 +252,38 @@
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       });
       if (!r.ok) return;
+
       const data = await r.json();
       if (!data.ok) return;
 
-      // новые сообщения
+      // 1️⃣ новые сообщения
       (data.messages || []).forEach(addMessage);
 
-      // состояние чата
+      // 2️⃣ ОБНОВЛЯЕМ ГАЛОЧКИ У УЖЕ ОТПРАВЛЕННЫХ СООБЩЕНИЙ ОПЕРАТОРА
+      if (Array.isArray(data.read_ids) && data.read_ids.length) {
+        for (const id of data.read_ids) {
+          const node = box.querySelector(`[data-mid="${id}"] .read-flag`);
+          if (node) {
+            node.textContent = '✓✓';
+            node.style.color = '#4caf50';
+          }
+        }
+      }
+
+      // 3️⃣ состояние чата
       if (data.chat) {
         if (data.chat.status) chatStatus = data.chat.status;
-        if (typeof data.chat.assigned_to_id !== 'undefined') assignedToId = data.chat.assigned_to_id;
+        if (typeof data.chat.assigned_to_id !== 'undefined') {
+          assignedToId = data.chat.assigned_to_id;
+        }
         updateUI();
       }
-    } catch (e) {}
+
+    } catch (e) {
+      console.error('poll error', e);
+    }
   }
+
 
   // send
   form.addEventListener('submit', async (e) => {
